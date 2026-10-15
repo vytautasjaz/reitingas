@@ -16,6 +16,8 @@ export type ImportLegInput = {
 export type ImportMeetInput = {
   name: string;
   meetDate: string; // YYYY-MM-DD
+  /** Foreign start — at most one counts in best-3. */
+  foreignStart?: boolean;
   legs: ImportLegInput[];
 };
 
@@ -114,8 +116,10 @@ export function importMeet(input: ImportMeetInput): ImportMeetResult {
 
   db.transaction(() => {
     const meetInfo = db
-      .prepare("INSERT INTO race_meets (name, meet_date) VALUES (?, ?)")
-      .run(input.name.trim(), input.meetDate);
+      .prepare(
+        "INSERT INTO race_meets (name, meet_date, foreign_start) VALUES (?, ?, ?)"
+      )
+      .run(input.name.trim(), input.meetDate, input.foreignStart ? 1 : 0);
     meetId = Number(meetInfo.lastInsertRowid);
 
     for (const leg of input.legs) {

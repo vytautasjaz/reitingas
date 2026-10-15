@@ -51,6 +51,7 @@ export default async function MeetDetailPage({
           <p>
             {formatDateLt(meet.meet_date)} · {races.length} distancija
             {races.length === 1 ? "" : "s"}
+            {meet.foreign_start ? " · Užsienio startas" : ""}
           </p>
         </div>
         <div className="flex shrink-0 gap-2">

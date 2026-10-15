@@ -13,6 +13,10 @@ export async function POST(req: NextRequest) {
     const form = await req.formData();
     const name = String(form.get("name") ?? "").trim();
     const raceDate = String(form.get("raceDate") ?? "").trim();
+    const foreignStart =
+      form.get("foreignStart") === "1" ||
+      form.get("foreignStart") === "on" ||
+      form.get("foreignStart") === "true";
 
     if (!name || !raceDate) {
       return NextResponse.json(
@@ -80,6 +84,7 @@ export async function POST(req: NextRequest) {
     const result = importMeet({
       name,
       meetDate: raceDate,
+      foreignStart,
       legs,
     });
 

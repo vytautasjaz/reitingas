@@ -9,7 +9,7 @@
     "lint": "eslint",
     "seed": "node --import tsx scripts/seed-members.ts",
     "import:sample": "node --import tsx scripts/import-sample-races.ts",
-    "test": "node --import tsx --test src/lib/scoring.test.ts src/lib/parse-results.test.ts src/lib/gender.test.ts src/lib/ranking-events.test.ts"
+    "test": "node --import tsx --test src/lib/scoring.test.ts src/lib/parse-results.test.ts src/lib/gender.test.ts src/lib/ranking-events.test.ts src/lib/manual-paste.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",

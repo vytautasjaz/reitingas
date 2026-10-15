@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { bestNSum, calculatePoints, parseTimeToSeconds } from "./scoring";
+import {
+  bestNSum,
+  bestNSumWithForeignLimit,
+  calculatePoints,
+  parseTimeToSeconds,
+} from "./scoring";
 import { normalizeName, namesMatch, toDisplayName } from "./names";
 import { clubMentionsTritonas, isMixedTritonasClub, isPureTritonasClub } from "./club";
 
@@ -35,6 +40,49 @@ describe("calculatePoints", () => {
 describe("bestNSum", () => {
   it("sums top 3", () => {
     assert.equal(bestNSum([100, 200, 50, 300], 3), 600);
+  });
+});
+
+describe("bestNSumWithForeignLimit", () => {
+  it("matches plain best-3 when no foreign scores", () => {
+    assert.equal(
+      bestNSumWithForeignLimit(
+        [{ points: 100 }, { points: 200 }, { points: 50 }, { points: 300 }],
+        3
+      ),
+      600
+    );
+  });
+
+  it("keeps at most one foreign start in the best-3", () => {
+    // Two strong foreign + two domestic — only best foreign may enter.
+    assert.equal(
+      bestNSumWithForeignLimit(
+        [
+          { points: 1100, foreign: true },
+          { points: 1050, foreign: true },
+          { points: 900 },
+          { points: 850 },
+        ],
+        3
+      ),
+      1100 + 900 + 850
+    );
+  });
+
+  it("drops a weak foreign when three domestics are better", () => {
+    assert.equal(
+      bestNSumWithForeignLimit(
+        [
+          { points: 700, foreign: true },
+          { points: 1000 },
+          { points: 950 },
+          { points: 900 },
+        ],
+        3
+      ),
+      1000 + 950 + 900
+    );
   });
 });
 

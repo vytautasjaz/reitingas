@@ -1,32 +1,45 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { DistanceType } from "@/lib/distances";
+import { analyzePaste } from "@/lib/manual-paste";
 
 type MemberOption = { id: number; display_name: string };
 
 type ParticipantRow = {
   key: string;
-  memberId: string;
   name: string;
-  place: string;
   time: string;
+  place: string;
 };
 
 type LegRow = {
   key: string;
   distanceType: DistanceType;
   leaderTime: string;
+  fieldSize: string;
   participants: ParticipantRow[];
 };
+
+type CellField = "place" | "name" | "time";
+
+const MIN_EMPTY_ROWS = 6;
 
 function newKey() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function newParticipant(): ParticipantRow {
-  return { key: newKey(), memberId: "", name: "", place: "", time: "" };
+function emptyRow(): ParticipantRow {
+  return { key: newKey(), name: "", time: "", place: "" };
+}
+
+function ensureTrailingEmpty(rows: ParticipantRow[]): ParticipantRow[] {
+  const filled = rows.filter(
+    (r) => r.name.trim() || r.time.trim() || r.place.trim()
+  );
+  const empties = Math.max(MIN_EMPTY_ROWS - filled.length, 1);
+  return [...filled, ...Array.from({ length: empties }, emptyRow)];
 }
 
 function newLeg(distanceType: DistanceType = "olympic"): LegRow {
@@ -34,7 +47,8 @@ function newLeg(distanceType: DistanceType = "olympic"): LegRow {
     key: newKey(),
     distanceType,
     leaderTime: "",
-    participants: [],
+    fieldSize: "",
+    participants: ensureTrailingEmpty([]),
   };
 }
 
@@ -44,7 +58,10 @@ export function ManualMeetForm({ members }: { members: MemberOption[] }) {
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [meetDate, setMeetDate] = useState("");
+  const [foreignStart, setForeignStart] = useState(false);
   const [legs, setLegs] = useState<LegRow[]>([newLeg()]);
+
+  const memberListId = useMemo(() => `manual-members-${newKey()}`, []);
 
   function updateLeg(key: string, patch: Partial<LegRow>) {
     setLegs((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -52,42 +69,152 @@ export function ManualMeetForm({ members }: { members: MemberOption[] }) {
 
   function updateParticipant(
     legKey: string,
-    participantKey: string,
+    rowKey: string,
     patch: Partial<ParticipantRow>
   ) {
     setLegs((prev) =>
       prev.map((leg) => {
         if (leg.key !== legKey) return leg;
-        return {
-          ...leg,
-          participants: leg.participants.map((p) =>
-            p.key === participantKey ? { ...p, ...patch } : p
-          ),
-        };
+        const next = leg.participants.map((p) =>
+          p.key === rowKey ? { ...p, ...patch } : p
+        );
+        return { ...leg, participants: ensureTrailingEmpty(next) };
       })
     );
   }
 
-  function addParticipant(legKey: string) {
-    setLegs((prev) =>
-      prev.map((leg) =>
-        leg.key === legKey
-          ? { ...leg, participants: [...leg.participants, newParticipant()] }
-          : leg
-      )
-    );
-  }
-
-  function removeParticipant(legKey: string, participantKey: string) {
+  function removeParticipant(legKey: string, rowKey: string) {
     setLegs((prev) =>
       prev.map((leg) => {
         if (leg.key !== legKey) return leg;
-        return {
-          ...leg,
-          participants: leg.participants.filter((p) => p.key !== participantKey),
-        };
+        const next = leg.participants.filter((p) => p.key !== rowKey);
+        return { ...leg, participants: ensureTrailingEmpty(next) };
       })
     );
+  }
+
+  function applyPaste(
+    legKey: string,
+    startRowKey: string,
+    text: string,
+    targetField: CellField
+  ) {
+    const analyzed = analyzePaste(text);
+    if (!analyzed) return;
+
+    setLegs((prev) =>
+      prev.map((leg) => {
+        if (leg.key !== legKey) return leg;
+        const startIdx = Math.max(
+          0,
+          leg.participants.findIndex((p) => p.key === startRowKey)
+        );
+        const next = [...leg.participants];
+
+        const ensureRow = (idx: number): ParticipantRow => {
+          while (next.length <= idx) next.push(emptyRow());
+          return next[idx];
+        };
+
+        if (analyzed.kind === "column") {
+          // Paste into the focused column only — keep other columns intact.
+          analyzed.values.forEach((value, i) => {
+            const row = ensureRow(startIdx + i);
+            next[startIdx + i] = { ...row, [targetField]: value };
+          });
+        } else {
+          analyzed.rows.forEach((r, i) => {
+            const row = ensureRow(startIdx + i);
+            next[startIdx + i] = {
+              ...row,
+              place: r.place || row.place,
+              name: r.name || row.name,
+              time: r.time || row.time,
+            };
+          });
+        }
+
+        return { ...leg, participants: ensureTrailingEmpty(next) };
+      })
+    );
+  }
+
+  function onGridPaste(
+    e: React.ClipboardEvent,
+    legKey: string,
+    rowKey: string,
+    targetField: CellField
+  ) {
+    const text = e.clipboardData.getData("text/plain");
+    // Multi-line or multi-cell paste → custom merge. Single cell → native input.
+    if (!text || (!text.includes("\n") && !text.includes("\t"))) return;
+    e.preventDefault();
+    applyPaste(legKey, rowKey, text, targetField);
+  }
+
+  function focusCell(legKey: string, rowIndex: number, field: CellField) {
+    const id = `cell-${legKey}-${rowIndex}-${field}`;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(id) as HTMLInputElement | null;
+      el?.focus();
+      el?.select();
+    });
+  }
+
+  function onCellKeyDown(
+    e: React.KeyboardEvent<HTMLInputElement>,
+    legKey: string,
+    rowIndex: number,
+    field: CellField,
+    rowCount: number
+  ) {
+    const order: CellField[] = ["place", "name", "time"];
+    const col = order.indexOf(field);
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (rowIndex + 1 >= rowCount) {
+        setLegs((prev) =>
+          prev.map((leg) =>
+            leg.key === legKey
+              ? {
+                  ...leg,
+                  participants: ensureTrailingEmpty([
+                    ...leg.participants,
+                    emptyRow(),
+                  ]),
+                }
+              : leg
+          )
+        );
+      }
+      focusCell(legKey, rowIndex + 1, field);
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (rowIndex + 1 < rowCount) focusCell(legKey, rowIndex + 1, field);
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (rowIndex > 0) focusCell(legKey, rowIndex - 1, field);
+      return;
+    }
+    if (e.key === "ArrowRight" && e.currentTarget.selectionStart === e.currentTarget.value.length) {
+      if (col < order.length - 1) {
+        e.preventDefault();
+        focusCell(legKey, rowIndex, order[col + 1]);
+      }
+      return;
+    }
+    if (e.key === "ArrowLeft" && e.currentTarget.selectionStart === 0) {
+      if (col > 0) {
+        e.preventDefault();
+        focusCell(legKey, rowIndex, order[col - 1]);
+      }
+    }
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -96,28 +223,44 @@ export function ManualMeetForm({ members }: { members: MemberOption[] }) {
     setError(null);
 
     try {
+      for (const [i, leg] of legs.entries()) {
+        const hasPlaces = leg.participants.some((p) => p.place.trim());
+        const fieldSize = Number(leg.fieldSize.trim());
+        if (
+          hasPlaces &&
+          (!leg.fieldSize.trim() || !Number.isFinite(fieldSize) || fieldSize <= 0)
+        ) {
+          throw new Error(
+            `Distancija ${i + 1}: jei įvedate vietas, nurodykite dalyvių skaičių`
+          );
+        }
+      }
+
       const payload = {
         name: name.trim(),
         meetDate,
-        legs: legs.map((leg) => ({
-          distanceType: leg.distanceType,
-          leaderTimeText: leg.leaderTime.trim(),
-          participants: leg.participants
-            .filter(
-              (p) =>
-                p.memberId ||
-                p.name.trim() ||
-                p.time.trim() ||
-                p.place.trim()
-            )
+        foreignStart,
+        legs: legs.map((leg) => {
+          const participants = leg.participants
+            .filter((p) => p.name.trim() || p.time.trim() || p.place.trim())
             .map((p) => ({
-              memberId: p.memberId ? Number(p.memberId) : null,
               name: p.name.trim() || undefined,
               place: p.place.trim() ? Number(p.place) : null,
               timeText: p.time.trim(),
               club: "TRItonas",
-            })),
-        })),
+            }));
+          const fieldSizeRaw = leg.fieldSize.trim();
+          const fieldSize = fieldSizeRaw ? Number(fieldSizeRaw) : null;
+          return {
+            distanceType: leg.distanceType,
+            leaderTimeText: leg.leaderTime.trim(),
+            fieldSize:
+              fieldSize != null && Number.isFinite(fieldSize) && fieldSize > 0
+                ? fieldSize
+                : null,
+            participants,
+          };
+        }),
       };
 
       const res = await fetch("/api/meets", {
@@ -144,13 +287,19 @@ export function ManualMeetForm({ members }: { members: MemberOption[] }) {
 
   return (
     <form onSubmit={onSubmit} className="card card-pad manual-meet-form">
+      <datalist id={memberListId}>
+        {members.map((m) => (
+          <option key={m.id} value={m.display_name} />
+        ))}
+      </datalist>
+
       <div>
         <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 800 }}>
           Įvesti rankiniu būdu
         </h3>
         <p style={{ margin: "0.35rem 0 0", color: "var(--muted)", fontSize: "0.9rem" }}>
-          Suveskite nugalėtojo laiką ir TRItono dalyvius su jų laikais. Taškai
-          skaičiuojami automatiškai.
+          Nugalėtojo laikas viršuje, lentelėje — vardas ir finišo laikas.
+          Galite įklijuoti stulpelius iš Excel (Ctrl/⌘+V).
         </p>
       </div>
 
@@ -165,7 +314,7 @@ export function ManualMeetForm({ members }: { members: MemberOption[] }) {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="pvz. LTT Panevėžys"
+            placeholder="pvz. Gdansk Half"
           />
         </div>
         <div>
@@ -184,133 +333,212 @@ export function ManualMeetForm({ members }: { members: MemberOption[] }) {
         </div>
       </div>
 
-      <div className="space-y-3">
-        {legs.map((leg, legIndex) => (
-          <div key={leg.key} className="manual-leg">
-            <div className="manual-leg-head">
-              <span className="manual-leg-index">{legIndex + 1}</span>
-              <div className="manual-meet-fields" style={{ flex: 1 }}>
-                <div>
-                  <label className="label" htmlFor={`manual-dist-${leg.key}`}>
-                    Distancija
-                  </label>
-                  <select
-                    id={`manual-dist-${leg.key}`}
-                    className="select"
-                    value={leg.distanceType}
-                    onChange={(e) =>
-                      updateLeg(leg.key, {
-                        distanceType: e.target.value as DistanceType,
-                      })
-                    }
-                  >
-                    <option value="sprint">Sprint / SD — 900</option>
-                    <option value="olympic">Olimpinė / OD — 1000</option>
-                    <option value="half">Half — 1100</option>
-                    <option value="full">Full — 1100</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label" htmlFor={`manual-leader-${leg.key}`}>
-                    Nugalėtojo laikas
-                  </label>
-                  <input
-                    id={`manual-leader-${leg.key}`}
-                    className="input font-mono"
-                    required
-                    placeholder="pvz. 1:08:19.0"
-                    value={leg.leaderTime}
-                    onChange={(e) =>
-                      updateLeg(leg.key, { leaderTime: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              {legs.length > 1 && (
-                <button
-                  type="button"
-                  className="btn btn-ghost text-sm"
-                  onClick={() =>
-                    setLegs((prev) => prev.filter((l) => l.key !== leg.key))
-                  }
-                  title="Pašalinti distanciją"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
+      <label className="check-label" htmlFor="manual-foreign">
+        <input
+          id="manual-foreign"
+          type="checkbox"
+          checked={foreignStart}
+          onChange={(e) => setForeignStart(e.target.checked)}
+        />
+        <span>
+          <strong>Užsienio startas</strong>
+          <span className="check-hint">
+            Į geriausių trijų sumą gali įeiti tik vienas užsienio startas
+          </span>
+        </span>
+      </label>
 
-            <div className="manual-participants">
-              {leg.participants.length > 0 && (
-                <div className="manual-participants-label">Dalyviai</div>
-              )}
-              {leg.participants.map((p) => (
-                <div key={p.key} className="manual-participant-row">
-                  <select
-                    className="select"
-                    value={p.memberId}
-                    onChange={(e) =>
-                      updateParticipant(leg.key, p.key, {
-                        memberId: e.target.value,
-                        name: e.target.value ? "" : p.name,
-                      })
-                    }
-                    aria-label="Narys"
-                  >
-                    <option value="">— narys arba vardas —</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.display_name}
-                      </option>
-                    ))}
-                  </select>
-                  {!p.memberId && (
-                    <input
-                      className="input"
-                      placeholder="Vardas Pavardė"
-                      value={p.name}
+      <div className="space-y-3">
+        {legs.map((leg, legIndex) => {
+          const hasPlaces = leg.participants.some((p) => p.place.trim());
+          return (
+            <div key={leg.key} className="manual-leg">
+              <div className="manual-leg-head">
+                <span className="manual-leg-index">{legIndex + 1}</span>
+                <div className="manual-meet-fields" style={{ flex: 1 }}>
+                  <div>
+                    <label className="label" htmlFor={`manual-dist-${leg.key}`}>
+                      Distancija
+                    </label>
+                    <select
+                      id={`manual-dist-${leg.key}`}
+                      className="select"
+                      value={leg.distanceType}
                       onChange={(e) =>
-                        updateParticipant(leg.key, p.key, { name: e.target.value })
+                        updateLeg(leg.key, {
+                          distanceType: e.target.value as DistanceType,
+                        })
+                      }
+                    >
+                      <option value="sprint">Sprint / SD — 900</option>
+                      <option value="olympic">Olimpinė / OD — 1000</option>
+                      <option value="half">Half — 1100</option>
+                      <option value="full">Full — 1100</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" htmlFor={`manual-leader-${leg.key}`}>
+                      Nugalėtojo laikas
+                    </label>
+                    <input
+                      id={`manual-leader-${leg.key}`}
+                      className="input font-mono"
+                      required
+                      placeholder="pvz. 3:57:55"
+                      value={leg.leaderTime}
+                      onChange={(e) =>
+                        updateLeg(leg.key, { leaderTime: e.target.value })
                       }
                     />
-                  )}
-                  <input
-                    className="input font-mono"
-                    placeholder="Vieta"
-                    inputMode="numeric"
-                    value={p.place}
-                    onChange={(e) =>
-                      updateParticipant(leg.key, p.key, { place: e.target.value })
-                    }
-                    style={{ maxWidth: "5rem" }}
-                  />
-                  <input
-                    className="input font-mono"
-                    placeholder="Laikas / DNF"
-                    value={p.time}
-                    onChange={(e) =>
-                      updateParticipant(leg.key, p.key, { time: e.target.value })
-                    }
-                  />
+                  </div>
+                  <div>
+                    <label className="label" htmlFor={`manual-field-${leg.key}`}>
+                      Dalyvių sk. {hasPlaces ? "" : "(nebūtina)"}
+                    </label>
+                    <input
+                      id={`manual-field-${leg.key}`}
+                      className="input font-mono"
+                      inputMode="numeric"
+                      placeholder={hasPlaces ? "pvz. 420" : "jei įvedate vietas"}
+                      value={leg.fieldSize}
+                      onChange={(e) =>
+                        updateLeg(leg.key, { fieldSize: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                {legs.length > 1 && (
                   <button
                     type="button"
-                    className="link-muted"
-                    onClick={() => removeParticipant(leg.key, p.key)}
+                    className="btn btn-ghost text-sm"
+                    onClick={() =>
+                      setLegs((prev) => prev.filter((l) => l.key !== leg.key))
+                    }
+                    title="Pašalinti distanciją"
                   >
-                    šalinti
+                    ✕
                   </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                className={leg.participants.length === 0 ? "btn btn-ghost text-sm" : "link-action"}
-                onClick={() => addParticipant(leg.key)}
-              >
-                {leg.participants.length === 0 ? "Pridėti dalyvį" : "+ Pridėti dar"}
-              </button>
+                )}
+              </div>
+
+              <div className="sheet-wrap">
+                <table className="sheet-table">
+                  <thead>
+                    <tr>
+                      <th className="sheet-col-nr">#</th>
+                      <th className="sheet-col-place">Vieta</th>
+                      <th className="sheet-col-name">Vardas Pavardė</th>
+                      <th className="sheet-col-time">Finišo laikas</th>
+                      <th className="sheet-col-act" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leg.participants.map((p, rowIndex) => (
+                      <tr key={p.key}>
+                        <td className="sheet-nr">{rowIndex + 1}</td>
+                        <td>
+                          <input
+                            id={`cell-${leg.key}-${rowIndex}-place`}
+                            className="sheet-input font-mono"
+                            inputMode="numeric"
+                            placeholder="—"
+                            value={p.place}
+                            onChange={(e) =>
+                              updateParticipant(leg.key, p.key, {
+                                place: e.target.value,
+                              })
+                            }
+                            onPaste={(e) =>
+                              onGridPaste(e, leg.key, p.key, "place")
+                            }
+                            onKeyDown={(e) =>
+                              onCellKeyDown(
+                                e,
+                                leg.key,
+                                rowIndex,
+                                "place",
+                                leg.participants.length
+                              )
+                            }
+                            aria-label="Vieta"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            id={`cell-${leg.key}-${rowIndex}-name`}
+                            className="sheet-input"
+                            list={memberListId}
+                            placeholder="Vardas Pavardė"
+                            value={p.name}
+                            onChange={(e) =>
+                              updateParticipant(leg.key, p.key, {
+                                name: e.target.value,
+                              })
+                            }
+                            onPaste={(e) =>
+                              onGridPaste(e, leg.key, p.key, "name")
+                            }
+                            onKeyDown={(e) =>
+                              onCellKeyDown(
+                                e,
+                                leg.key,
+                                rowIndex,
+                                "name",
+                                leg.participants.length
+                              )
+                            }
+                            aria-label="Vardas Pavardė"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            id={`cell-${leg.key}-${rowIndex}-time`}
+                            className="sheet-input font-mono"
+                            placeholder="4:21:57 / DNF"
+                            value={p.time}
+                            onChange={(e) =>
+                              updateParticipant(leg.key, p.key, {
+                                time: e.target.value,
+                              })
+                            }
+                            onPaste={(e) =>
+                              onGridPaste(e, leg.key, p.key, "time")
+                            }
+                            onKeyDown={(e) =>
+                              onCellKeyDown(
+                                e,
+                                leg.key,
+                                rowIndex,
+                                "time",
+                                leg.participants.length
+                              )
+                            }
+                            aria-label="Finišo laikas"
+                          />
+                        </td>
+                        <td className="sheet-act">
+                          {(p.name || p.time || p.place) && (
+                            <button
+                              type="button"
+                              className="link-muted"
+                              onClick={() => removeParticipant(leg.key, p.key)}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="sheet-hint">
+                  Galite įklijuoti stulpelius atskirai (pirmiausia vardus, tada
+                  laikus į laiko stulpelį) arba kartu: „Vardas · Laikas“.
+                </p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="manual-meet-actions">

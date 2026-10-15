@@ -26,7 +26,11 @@ export async function PATCH(
       return NextResponse.json({ ok: false, error: "Varžybos nerastos" }, { status: 404 });
     }
 
-    const body = (await req.json()) as { name?: string; meetDate?: string };
+    const body = (await req.json()) as {
+      name?: string;
+      meetDate?: string;
+      foreignStart?: boolean;
+    };
     if (!body.name?.trim() || !body.meetDate) {
       return NextResponse.json(
         { ok: false, error: "Trūksta privalomų laukų" },
@@ -37,6 +41,7 @@ export async function PATCH(
     const meet = updateMeet(meetId, {
       name: body.name,
       meetDate: body.meetDate,
+      foreignStart: !!body.foreignStart,
     });
     revalidateAll(meetId);
     return NextResponse.json({ ok: true, meet });

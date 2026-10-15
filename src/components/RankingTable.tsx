@@ -252,7 +252,15 @@ export function RankingTable({
                     title={`${ev.label} — rikiuoti pagal geriausią rezultata šiame etape`}
                   >
                     <span className="race-col-stack">
-                      <span className="race-col-name">{shortMeetName(ev)}</span>
+                      <span className="race-col-name">
+                        {shortMeetName(ev)}
+                        {ev.foreignStart ? (
+                          <span className="foreign-mark" title="Užsienio startas">
+                            {" "}
+                            · užs.
+                          </span>
+                        ) : null}
+                      </span>
                       <span className="race-col-meta">
                         {formatDateLt(ev.date)}
                         {ev.races.length > 1

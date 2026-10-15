@@ -23,6 +23,7 @@ export async function GET(
         id: meet.id,
         name: meet.name,
         meet_date: meet.meet_date,
+        foreign_start: !!meet.foreign_start,
         races: races.map((r) => ({
           id: r.id,
           name: r.name,

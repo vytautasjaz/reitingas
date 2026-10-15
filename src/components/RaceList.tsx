@@ -62,6 +62,7 @@ export function RaceList({ meets }: { meets: MeetWithRaces[] }) {
             <tr>
               <th>Data</th>
               <th>Varžybos</th>
+              <th>Tipas</th>
               <th>Distancijos</th>
               <th>Veiksmai</th>
             </tr>
@@ -78,6 +79,15 @@ export function RaceList({ meets }: { meets: MeetWithRaces[] }) {
                   >
                     {meet.name}
                   </Link>
+                </td>
+                <td>
+                  {meet.foreign_start ? (
+                    <span className="foreign-tag" title="Užsienio startas">
+                      Užsienio
+                    </span>
+                  ) : (
+                    <span className="muted text-sm">—</span>
+                  )}
                 </td>
                 <td>
                   <div className="row-actions">

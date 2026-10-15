@@ -2,7 +2,11 @@ import { getDb, Race } from "./db";
 import { Sex } from "./gender";
 import { shortDistance } from "./distances";
 import { getMeetRaces, listMeets } from "./meets";
-import { averagePoints, bestNSum } from "./scoring";
+import {
+  averagePoints,
+  bestNSumWithForeignLimit,
+  type ScoredResult,
+} from "./scoring";
 
 export { shortDistance };
 
@@ -53,6 +57,7 @@ export type RaceEvent = {
   date: string;
   races: Race[];
   label: string;
+  foreignStart: boolean;
 };
 
 export function listRaces(year?: number): Race[] {
@@ -87,11 +92,14 @@ export function groupRacesIntoEvents(races?: Race[], year?: number): RaceEvent[]
             date: m.meet_date,
             races: meetRaces,
             label: formatMeetLabel(m.name, meetRaces),
+            foreignStart: !!m.foreign_start,
           };
         })
         .filter((e) => e.races.length > 0);
     }
   }
+
+  const foreignMeetIds = loadForeignMeetIds();
 
   // Group by meet_id when present (tests / partial lists)
   if (allRaces.some((r) => r.meet_id != null)) {
@@ -112,6 +120,7 @@ export function groupRacesIntoEvents(races?: Race[], year?: number): RaceEvent[]
           date: sorted[0].race_date,
           races: sorted,
           label: formatMeetLabel(sorted[0].name, sorted),
+          foreignStart: foreignMeetIds.has(id),
         };
       })
       .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
@@ -131,7 +140,19 @@ export function groupRacesIntoEvents(races?: Race[], year?: number): RaceEvent[]
       date,
       races: dayRaces,
       label: formatMeetLabel(dayRaces[0]?.name ?? date, dayRaces),
+      foreignStart: false,
     }));
+}
+
+function loadForeignMeetIds(): Set<number> {
+  try {
+    const rows = getDb()
+      .prepare("SELECT id FROM race_meets WHERE foreign_start = 1")
+      .all() as Array<{ id: number }>;
+    return new Set(rows.map((r) => r.id));
+  } catch {
+    return new Set();
+  }
 }
 
 function distanceOrder(race: Race): number {
@@ -250,7 +271,7 @@ function standingsFromResults(
   const byMember = new Map<
     number,
     {
-      scores: number[];
+      scores: ScoredResult[];
       pointsByRace: Record<number, number | null>;
       detailsByRace: Record<number, StandingRaceDetail>;
       meetKeys: Set<string>;
@@ -258,6 +279,7 @@ function standingsFromResults(
   >();
 
   const raceById = new Map(races.map((r) => [r.id, r]));
+  const foreignMeetIds = loadForeignMeetIds();
 
   for (const m of members) {
     if (sexFilter !== "all" && m.sex !== sexFilter) continue;
@@ -277,8 +299,11 @@ function standingsFromResults(
     if (!allowedRaceIds.has(row.race_id)) continue;
     const bucket = byMember.get(row.member_id);
     if (!bucket) continue;
+    const race = raceById.get(row.race_id);
+    const foreign =
+      race?.meet_id != null ? foreignMeetIds.has(race.meet_id) : false;
     // DNF (0) counts as a stage but not toward best-3 / average positives.
-    if (row.points > 0) bucket.scores.push(row.points);
+    if (row.points > 0) bucket.scores.push({ points: row.points, foreign });
     bucket.pointsByRace[row.race_id] = row.points;
     const sexTotal =
       row.sex === "F"
@@ -301,7 +326,6 @@ function standingsFromResults(
       points: row.points,
       finishStatus,
     };
-    const race = raceById.get(row.race_id);
     if (race) {
       bucket.meetKeys.add(
         race.meet_id != null ? `m:${race.meet_id}` : `d:${race.race_date}`
@@ -317,6 +341,7 @@ function standingsFromResults(
     // Include athletes with only DNF stages (eventCount > 0, best3 = 0).
     if (!bucket || bucket.meetKeys.size === 0) continue;
 
+    const pointValues = bucket.scores.map((s) => s.points);
     standings.push({
       place: 0,
       memberId: m.id,
@@ -324,9 +349,9 @@ function standingsFromResults(
       sex: m.sex,
       raceCount: Object.values(bucket.detailsByRace).length,
       eventCount: bucket.meetKeys.size,
-      totalPoints: bucket.scores.reduce((a, b) => a + b, 0),
-      average: averagePoints(bucket.scores),
-      best3Sum: bestNSum(bucket.scores, bestN),
+      totalPoints: pointValues.reduce((a, b) => a + b, 0),
+      average: averagePoints(pointValues),
+      best3Sum: bestNSumWithForeignLimit(bucket.scores, bestN),
       pointsByRace: bucket.pointsByRace,
       detailsByRace: bucket.detailsByRace,
       change: null,

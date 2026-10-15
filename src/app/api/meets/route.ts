@@ -12,9 +12,11 @@ export const runtime = "nodejs";
 type Body = {
   name?: string;
   meetDate?: string;
+  foreignStart?: boolean;
   legs?: Array<{
     distanceType?: DistanceType;
     leaderTimeText?: string;
+    fieldSize?: number | null;
     participants?: Array<{
       memberId?: number | null;
       name?: string;
@@ -72,9 +74,17 @@ export async function POST(req: NextRequest) {
           club: p.club,
         }));
 
+      const fieldSize =
+        leg.fieldSize != null &&
+        Number.isFinite(Number(leg.fieldSize)) &&
+        Number(leg.fieldSize) > 0
+          ? Math.round(Number(leg.fieldSize))
+          : null;
+
       return {
         distanceType: leg.distanceType,
         leaderTimeText: leg.leaderTimeText,
+        fieldSize,
         participants,
       };
     });
@@ -82,6 +92,7 @@ export async function POST(req: NextRequest) {
     const result = createManualMeet({
       name: body.name,
       meetDate: body.meetDate,
+      foreignStart: !!body.foreignStart,
       legs,
     });
 

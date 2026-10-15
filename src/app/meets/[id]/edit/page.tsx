@@ -8,6 +8,7 @@ type MeetPayload = {
   id: number;
   name: string;
   meet_date: string;
+  foreign_start: boolean;
   races: Array<{ id: number; name: string; distance_type: string }>;
 };
 
@@ -18,6 +19,7 @@ export default function MeetEditPage() {
 
   const [name, setName] = useState("");
   const [meetDate, setMeetDate] = useState("");
+  const [foreignStart, setForeignStart] = useState(false);
   const [races, setRaces] = useState<MeetPayload["races"]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,6 +42,7 @@ export default function MeetEditPage() {
         if (cancelled) return;
         setName(json.meet.name);
         setMeetDate(json.meet.meet_date);
+        setForeignStart(!!json.meet.foreign_start);
         setRaces(json.meet.races);
       } catch (err) {
         if (!cancelled) {
@@ -63,7 +66,7 @@ export default function MeetEditPage() {
       const res = await fetch(`/api/meets/${meetId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, meetDate }),
+        body: JSON.stringify({ name, meetDate, foreignStart }),
       });
       const json = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !json.ok) throw new Error(json.error ?? "Nepavyko");
@@ -129,6 +132,22 @@ export default function MeetEditPage() {
             onChange={(e) => setMeetDate(e.target.value)}
             required
           />
+        </div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label className="check-label" htmlFor="meet-foreign">
+            <input
+              id="meet-foreign"
+              type="checkbox"
+              checked={foreignStart}
+              onChange={(e) => setForeignStart(e.target.checked)}
+            />
+            <span>
+              <strong>Užsienio startas</strong>
+              <span className="check-hint">
+                Į geriausių trijų sumą gali įeiti tik vienas užsienio startas
+              </span>
+            </span>
+          </label>
         </div>
         <div style={{ gridColumn: "1 / -1", display: "flex", gap: "0.75rem", alignItems: "center" }}>
           <button type="submit" className="btn btn-primary" disabled={saving}>

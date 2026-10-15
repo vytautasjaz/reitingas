@@ -126,9 +126,19 @@ function migrate(db: Database.Database) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       meet_date TEXT NOT NULL,
+      foreign_start INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  const meetCols = db.prepare("PRAGMA table_info(race_meets)").all() as Array<{
+    name: string;
+  }>;
+  if (!meetCols.some((c) => c.name === "foreign_start")) {
+    db.exec(
+      "ALTER TABLE race_meets ADD COLUMN foreign_start INTEGER NOT NULL DEFAULT 0"
+    );
+  }
 
   if (!raceCols.some((c) => c.name === "meet_id")) {
     db.exec(
@@ -247,6 +257,8 @@ export type RaceMeet = {
   id: number;
   name: string;
   meet_date: string;
+  /** 1 = foreign start; at most one such meet counts in best-3. */
+  foreign_start: number;
   created_at: string;
 };
 

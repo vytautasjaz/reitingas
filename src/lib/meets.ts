@@ -19,12 +19,16 @@ export type ManualParticipantInput = {
 export type ManualLegInput = {
   distanceType: DistanceType;
   leaderTimeText: string;
+  /** Total finishers in the full field (optional; useful with places). */
+  fieldSize?: number | null;
   participants?: ManualParticipantInput[];
 };
 
 export type CreateManualMeetInput = {
   name: string;
   meetDate: string;
+  /** Foreign start — at most one counts in best-3. */
+  foreignStart?: boolean;
   legs: ManualLegInput[];
 };
 
@@ -98,15 +102,27 @@ export function listMeetsWithRaces(year?: number): MeetWithRaces[] {
 
 export function updateMeet(
   meetId: number,
-  input: { name: string; meetDate: string }
+  input: { name: string; meetDate: string; foreignStart?: boolean }
 ): RaceMeet {
   const db = getDb();
   const name = input.name.trim();
-  db.prepare("UPDATE race_meets SET name = ?, meet_date = ? WHERE id = ?").run(
-    name,
-    input.meetDate,
-    meetId
-  );
+  const foreign =
+    input.foreignStart === undefined
+      ? null
+      : input.foreignStart
+        ? 1
+        : 0;
+  if (foreign == null) {
+    db.prepare("UPDATE race_meets SET name = ?, meet_date = ? WHERE id = ?").run(
+      name,
+      input.meetDate,
+      meetId
+    );
+  } else {
+    db.prepare(
+      "UPDATE race_meets SET name = ?, meet_date = ?, foreign_start = ? WHERE id = ?"
+    ).run(name, input.meetDate, foreign, meetId);
+  }
   // Keep race_date in sync for ranking / display
   db.prepare("UPDATE races SET race_date = ? WHERE meet_id = ?").run(
     input.meetDate,
@@ -137,15 +153,17 @@ export function createManualMeet(
 
   db.transaction(() => {
     const meetInfo = db
-      .prepare("INSERT INTO race_meets (name, meet_date) VALUES (?, ?)")
-      .run(name, input.meetDate);
+      .prepare(
+        "INSERT INTO race_meets (name, meet_date, foreign_start) VALUES (?, ?, ?)"
+      )
+      .run(name, input.meetDate, input.foreignStart ? 1 : 0);
     meetId = Number(meetInfo.lastInsertRowid);
 
     const insertRace = db.prepare(
       `INSERT INTO races (
         name, race_date, distance_type, base_points, source_filename,
-        leader_time_seconds, meet_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        leader_time_seconds, meet_id, field_size
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     );
 
     const insertResult = db.prepare(
@@ -164,6 +182,12 @@ export function createManualMeet(
       }
 
       const base = BASE_POINTS[leg.distanceType];
+      const fieldSize =
+        leg.fieldSize != null &&
+        Number.isFinite(leg.fieldSize) &&
+        leg.fieldSize > 0
+          ? Math.round(leg.fieldSize)
+          : null;
       const raceInfo = insertRace.run(
         legRaceName(name, leg.distanceType),
         input.meetDate,
@@ -171,7 +195,8 @@ export function createManualMeet(
         base,
         "rankinis įvedimas",
         leader,
-        meetId
+        meetId,
+        fieldSize
       );
       const raceId = Number(raceInfo.lastInsertRowid);
       raceIds.push(raceId);

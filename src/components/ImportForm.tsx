@@ -137,6 +137,23 @@ export function ImportForm() {
         </div>
 
         <div style={{ gridColumn: "1 / -1" }}>
+          <label className="check-label" htmlFor="foreignStart">
+            <input
+              id="foreignStart"
+              name="foreignStart"
+              type="checkbox"
+              value="1"
+            />
+            <span>
+              <strong>Užsienio startas</strong>
+              <span className="check-hint">
+                Į geriausių trijų sumą gali įeiti tik vienas užsienio startas
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div style={{ gridColumn: "1 / -1" }}>
           <label className="label">Protokolai</label>
           <div className="leg-list">
             {legs.map((leg, index) => (
