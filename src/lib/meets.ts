@@ -1,10 +1,14 @@
-import { getDb, BASE_POINTS, DistanceType, Race, RaceMeet } from "./db";
+import { getDb, DistanceType, Race, RaceMeet } from "./db";
 import { ensureMember } from "./members";
 import {
-  calculatePoints,
   classifyFinishStatus,
   parseTimeToSeconds,
 } from "./scoring";
+import {
+  basePointsForDistanceId,
+  distanceSetting,
+  scoreAthlete,
+} from "./settings";
 
 export type MeetWithRaces = RaceMeet & { races: Race[] };
 
@@ -39,6 +43,8 @@ export type CreateManualMeetResult = {
 };
 
 function legSuffix(distanceType: DistanceType): string {
+  const fromSettings = distanceSetting(distanceType);
+  if (fromSettings) return fromSettings.shortLabel;
   if (distanceType === "olympic") return "OD";
   if (distanceType === "sprint") return "SD";
   if (distanceType === "half") return "Half";
@@ -181,7 +187,7 @@ export function createManualMeet(
         );
       }
 
-      const base = BASE_POINTS[leg.distanceType];
+      const base = basePointsForDistanceId(leg.distanceType);
       const fieldSize =
         leg.fieldSize != null &&
         Number.isFinite(leg.fieldSize) &&
@@ -247,7 +253,14 @@ export function createManualMeet(
         }
 
         const points =
-          status === "dnf" ? 0 : calculatePoints(leader, timeSeconds!, base);
+          status === "dnf"
+            ? 0
+            : scoreAthlete(
+                leader,
+                timeSeconds!,
+                leg.distanceType,
+                !!input.foreignStart
+              );
         const club = (p.club?.trim() || "TRItonas").slice(0, 200);
 
         insertResult.run(

@@ -35,6 +35,13 @@ describe("calculatePoints", () => {
     const ath = 1 * 3600 + 13 * 60 + 2.4;
     assert.equal(calculatePoints(leader, ath, 900), 842);
   });
+
+  it("applies foreign bonus percent", () => {
+    assert.equal(
+      calculatePoints(3600, 3600, 1000, { foreignBonusPercent: 10 }),
+      1100
+    );
+  });
 });
 
 describe("bestNSum", () => {

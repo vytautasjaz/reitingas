@@ -1,11 +1,12 @@
-import { getDb, DistanceType, BASE_POINTS, Race, RaceMeet } from "./db";
+import { getDb, DistanceType, Race, RaceMeet } from "./db";
 import { clubMentionsTritonas, isMixedTritonasClub, isPureTritonasClub } from "./club";
 import { detectCategoryConvention, normalizeSex } from "./gender";
 import { ensureMember, findMemberByName, setMemberSex } from "./members";
 import { parseResultsFileBuffer, ParsedResultRow } from "./parse-results";
 import { computeFieldSizes, computePlaceBySexMap } from "./place-by-sex";
-import { calculatePoints, formatSeconds } from "./scoring";
+import { formatSeconds } from "./scoring";
 import { normalizeName, toDisplayName } from "./names";
+import { basePointsForDistanceId, scoreAthlete } from "./settings";
 
 export type ImportLegInput = {
   distanceType: DistanceType;
@@ -77,6 +78,10 @@ export function assertLeaderMatchesDistance(
 ) {
   const label = sourceFilename ? `„${sourceFilename}“` : "protokolas";
   const timeLabel = formatSeconds(leaderSeconds);
+  // Only validate built-in triathlon distances.
+  const known = new Set(["sprint", "olympic", "half", "full"]);
+  if (!known.has(distanceType)) return;
+
   // Olympic / half winners are typically well over 1.5h; sprint under ~1.5h.
   if (distanceType === "olympic" && leaderSeconds < 5400) {
     throw new Error(
@@ -130,6 +135,7 @@ export function importMeet(input: ImportMeetInput): ImportMeetResult {
         distanceType: leg.distanceType,
         sourceFilename: leg.sourceFilename,
         fileBuffer: leg.fileBuffer,
+        foreign: !!input.foreignStart,
       });
       raceIds.push(result.raceId);
       totalRows += result.totalRows;
@@ -171,7 +177,8 @@ function fillRaceResults(
   raceId: number,
   parsed: { rows: ParsedResultRow[] },
   leader: number,
-  base: number
+  distanceType: DistanceType,
+  foreign: boolean
 ): Omit<LegInsertResult, "raceId"> {
   const db = getDb();
   const newMembers: string[] = [];
@@ -189,11 +196,20 @@ function fillRaceResults(
   const categoryConvention = detectCategoryConvention(
     parsed.rows.map((r) => r.category)
   );
-  const placeBySex = computePlaceBySexMap(parsed.rows);
-  const fieldSizes = computeFieldSizes(parsed.rows);
-  db.prepare(
-    `UPDATE races SET field_size = ?, field_size_m = ?, field_size_f = ? WHERE id = ?`
-  ).run(fieldSizes.total, fieldSizes.m, fieldSizes.f, raceId);
+  // Only store field sizes / sex places when the file has real protocol places
+  // (not a Tritonas-only name+time roster).
+  const hasProtocolPlaces = parsed.rows.some(
+    (r) => r.place != null && Number.isFinite(r.place)
+  );
+  const placeBySex = hasProtocolPlaces
+    ? computePlaceBySexMap(parsed.rows)
+    : new Map<string, number>();
+  if (hasProtocolPlaces) {
+    const fieldSizes = computeFieldSizes(parsed.rows);
+    db.prepare(
+      `UPDATE races SET field_size = ?, field_size_m = ?, field_size_f = ? WHERE id = ?`
+    ).run(fieldSizes.total, fieldSizes.m, fieldSizes.f, raceId);
+  }
 
   for (const row of parsed.rows) {
     const club = row.club;
@@ -232,7 +248,7 @@ function fillRaceResults(
     let points: number | null = null;
     if (include) {
       if (secs != null) {
-        points = calculatePoints(leader, secs, base);
+        points = scoreAthlete(leader, secs, distanceType, foreign);
       } else if (finishStatus === "dnf") {
         points = 0;
       }
@@ -275,9 +291,10 @@ function insertRaceLeg(input: {
   distanceType: DistanceType;
   sourceFilename?: string;
   fileBuffer: Buffer;
+  foreign?: boolean;
 }): LegInsertResult {
   const parsed = parseResultsFileBuffer(input.fileBuffer);
-  const base = BASE_POINTS[input.distanceType];
+  const base = basePointsForDistanceId(input.distanceType);
   const leader = parsed.leaderTimeSeconds;
 
   if (leader == null) {
@@ -309,7 +326,13 @@ function insertRaceLeg(input: {
       input.meetId
     );
   const id = Number(info.lastInsertRowid);
-  const filled = fillRaceResults(id, parsed, leader, base);
+  const filled = fillRaceResults(
+    id,
+    parsed,
+    leader,
+    input.distanceType,
+    !!input.foreign
+  );
 
   return { raceId: id, ...filled };
 }
@@ -343,11 +366,17 @@ export function replaceRaceProtocol(
        WHERE id = ?`
     ).run(sourceFilename ?? null, leader, raceId);
 
+    const meet = race.meet_id
+      ? (db
+          .prepare("SELECT foreign_start FROM race_meets WHERE id = ?")
+          .get(race.meet_id) as { foreign_start: number } | undefined)
+      : undefined;
     const filled = fillRaceResults(
       raceId,
       parsed,
       leader,
-      race.base_points
+      race.distance_type,
+      !!meet?.foreign_start
     );
     return { raceId, ...filled };
   })();

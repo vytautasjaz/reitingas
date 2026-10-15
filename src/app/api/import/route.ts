@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, DistanceType } from "@/lib/db";
 import { importMeet } from "@/lib/import-race";
 import { revalidatePath } from "next/cache";
+import { getSettings } from "@/lib/settings";
 
 export const runtime = "nodejs";
-
-const DISTANCES = new Set(["sprint", "olympic", "half", "full"]);
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,7 +43,8 @@ export async function POST(req: NextRequest) {
             { status: 400 }
           );
         }
-        if (!DISTANCES.has(distanceType)) {
+        const allowed = new Set(getSettings().distances.map((d) => d.id));
+        if (!allowed.has(distanceType)) {
           return NextResponse.json(
             { ok: false, error: `Neteisinga distancija #${i + 1}` },
             { status: 400 }
@@ -68,7 +68,8 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      if (!DISTANCES.has(distanceType)) {
+      const allowed = new Set(getSettings().distances.map((d) => d.id));
+      if (!allowed.has(distanceType)) {
         return NextResponse.json(
           { ok: false, error: "Neteisinga distancija" },
           { status: 400 }

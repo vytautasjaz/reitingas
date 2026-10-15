@@ -7,6 +7,7 @@ import { listMembers, backfillMemberSexFromNames } from "@/lib/members";
 import { getDb } from "@/lib/db";
 import { backfillPlaceBySexFromSources } from "@/lib/place-by-sex";
 import { getActiveSeasonYear } from "@/lib/season";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function HomePage() {
   backfillPlaceBySexFromSources();
 
   const year = await getActiveSeasonYear();
+  const bestN = getSettings().bestN;
   const members = listMembers();
   const events = groupRacesIntoEvents(undefined, year);
   const topMen = topStandings("M", undefined, year);
@@ -27,8 +29,8 @@ export default async function HomePage() {
         <div>
           <h1>Bendra įskaita {year}</h1>
           <p className="page-lead">
-            3 geriausių etapų suma · pokytis nuo praėjusio etapo · OD ir SD tą
-            pačią dieną skaitomi kaip vienas etapas
+            {bestN} geriausių etapų suma · pokytis nuo praėjusio etapo · OD ir SD
+            tą pačią dieną skaitomi kaip vienas etapas
           </p>
         </div>
       </div>
@@ -58,7 +60,12 @@ export default async function HomePage() {
           suveskite rezultatus skiltyje Varžybos.
         </div>
       ) : (
-        <TopAthletes men={topMen} women={topWomen} events={events} />
+        <TopAthletes
+          men={topMen}
+          women={topWomen}
+          events={events}
+          bestN={bestN}
+        />
       )}
     </div>
   );

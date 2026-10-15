@@ -28,10 +28,10 @@ function bestRaceIdSet(
   );
 }
 
+/** Show place only with a real field size (full protocol / explicit totals). */
 function formatPlace(place: number | null, total: number | null): string {
-  if (place == null) return "—";
-  if (total != null) return `${place}/${total}`;
-  return String(place);
+  if (place == null || total == null || total <= 0) return "—";
+  return `${place}/${total}`;
 }
 
 export function collectAthleteResults(row: StandingRow, events: RaceEvent[]) {

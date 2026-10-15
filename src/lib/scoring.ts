@@ -7,21 +7,35 @@ export {
   type FinishStatus,
 } from "./time-format";
 
+export type CalculatePointsOptions = {
+  /** Power on (leader/athlete). Default 1. */
+  exponent?: number;
+  /** Extra percent for foreign starts (10 → ×1.10). */
+  foreignBonusPercent?: number;
+};
+
 /**
  * Points relative to race leader:
- * ROUND(leader_time / athlete_time * base)
+ * ROUND( (leader_time / athlete_time) ^ exponent * base * foreignMult )
  */
 export function calculatePoints(
   leaderSeconds: number,
   athleteSeconds: number,
-  base: number
+  base: number,
+  opts?: CalculatePointsOptions
 ): number {
   if (leaderSeconds <= 0 || athleteSeconds <= 0 || base <= 0) return 0;
-  return Math.round((leaderSeconds / athleteSeconds) * base);
+  const exponent = opts?.exponent ?? 1;
+  const ratio = Math.pow(leaderSeconds / athleteSeconds, exponent);
+  let points = ratio * base;
+  const bonus = opts?.foreignBonusPercent ?? 0;
+  if (bonus > 0) points *= 1 + bonus / 100;
+  return Math.round(points);
 }
 
+/** Fallback only — prefer settings.basePointsForDistanceId on the server. */
 export function basePointsForDistance(distance: DistanceType): number {
-  return BASE_POINTS[distance];
+  return BASE_POINTS[distance] ?? 1000;
 }
 
 /** Sum of the N best positive scores (default 3). */
@@ -32,17 +46,18 @@ export function bestNSum(scores: number[], n = 3): number {
 
 export type ScoredResult = {
   points: number;
-  /** Foreign start — at most one such result may enter the best-N sum. */
+  /** Foreign start — limited count may enter the best-N sum. */
   foreign?: boolean;
 };
 
 /**
- * Best-N sum with at most one foreign-start score.
- * Chooses the better of: top N domestic, or best foreign + top (N-1) domestic.
+ * Best-N sum with at most `maxForeign` foreign-start scores (default 1).
+ * Picks the combination that maximizes the sum.
  */
 export function bestNSumWithForeignLimit(
   scores: ScoredResult[],
-  n = 3
+  n = 3,
+  maxForeign = 1
 ): number {
   if (n <= 0) return 0;
   const positive = scores.filter((s) => s.points > 0);
@@ -56,13 +71,15 @@ export function bestNSumWithForeignLimit(
     .sort((a, b) => b - a);
 
   const sumTop = (arr: number[], count: number) =>
-    arr.slice(0, count).reduce((sum, s) => sum + s, 0);
+    arr.slice(0, Math.max(0, count)).reduce((sum, s) => sum + s, 0);
 
-  const withoutForeign = sumTop(domestic, n);
-  if (foreign.length === 0 || n === 0) return withoutForeign;
-
-  const withForeign = foreign[0] + sumTop(domestic, n - 1);
-  return Math.max(withoutForeign, withForeign);
+  const foreignSlots = Math.max(0, Math.min(maxForeign, n, foreign.length));
+  let best = sumTop(domestic, n);
+  for (let f = 1; f <= foreignSlots; f++) {
+    const candidate = sumTop(foreign, f) + sumTop(domestic, n - f);
+    if (candidate > best) best = candidate;
+  }
+  return best;
 }
 
 export function averagePoints(scores: number[]): number | null {

@@ -10,6 +10,7 @@ import { backfillMemberSexFromNames } from "@/lib/members";
 import { getDb } from "@/lib/db";
 import { backfillPlaceBySexFromSources } from "@/lib/place-by-sex";
 import { getActiveSeasonYear } from "@/lib/season";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -29,11 +30,12 @@ export default async function StandingsPage({
   backfillPlaceBySexFromSources();
 
   const year = await getActiveSeasonYear();
+  const bestN = getSettings().bestN;
   const params = await searchParams;
   const sexFilter = parseSexFilter(params.sex);
   const events = groupRacesIntoEvents(undefined, year);
   const counts = countStandingsBySex(year);
-  const standings = computeStandings(3, sexFilter, year);
+  const standings = computeStandings(undefined, sexFilter, year);
 
   return (
     <div>
@@ -49,7 +51,7 @@ export default async function StandingsPage({
 
       <GenderFilter active={sexFilter} counts={counts} basePath="/standings" />
 
-      <RankingTable standings={standings} events={events} />
+      <RankingTable standings={standings} events={events} bestN={bestN} />
     </div>
   );
 }

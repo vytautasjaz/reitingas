@@ -41,7 +41,7 @@ describe("parseResultsFileBuffer Gdansk compact xlsx", () => {
     assert.equal(parsed.rows.length, 17);
     assert.equal(parsed.rows[0].name, "Airidas Gražinskis");
     assert.equal(parsed.rows[0].club, "TRItonas");
-    assert.equal(parsed.rows[0].place, 1);
+    assert.equal(parsed.rows[0].place, null);
     assert.ok(parsed.rows[0].timeSeconds != null);
     assert.ok(parsed.rows.every((r) => clubMentionsTritonas(r.club)));
   });

@@ -126,10 +126,12 @@ function SortTh({
 export function RankingTable({
   standings,
   events,
+  bestN = 3,
 }: {
   standings: StandingRow[];
   races?: Race[];
   events: RaceEvent[];
+  bestN?: number;
 }) {
   const [showRaces, setShowRaces] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -287,8 +289,8 @@ export function RankingTable({
                 dir={sortDir}
                 onSort={onSort}
                 className="col-narrow"
-                title="3 geriausių suma"
-                label="Top 3"
+                title={`${bestN} geriausių suma`}
+                label={`Top ${bestN}`}
               />
             </tr>
           </thead>
@@ -302,6 +304,7 @@ export function RankingTable({
                   key={row.memberId}
                   row={row}
                   events={events}
+                  bestN={bestN}
                   rowClass={rowClass}
                   showRaces={showRaces}
                   open={open}
@@ -321,6 +324,7 @@ export function RankingTable({
 function StandingBlock({
   row,
   events,
+  bestN,
   rowClass,
   showRaces,
   open,
@@ -328,6 +332,7 @@ function StandingBlock({
 }: {
   row: StandingRow;
   events: RaceEvent[];
+  bestN: number;
   rowClass: string;
   showRaces: boolean;
   open: boolean;
@@ -378,7 +383,7 @@ function StandingBlock({
       {open && (
         <tr className="detail-row">
           <td colSpan={detailColSpan}>
-            <RaceBreakdown row={row} events={events} />
+            <RaceBreakdown row={row} events={events} bestN={bestN} />
           </td>
         </tr>
       )}
@@ -421,9 +426,11 @@ function MeetCell({ row, event }: { row: StandingRow; event: RaceEvent }) {
 function RaceBreakdown({
   row,
   events,
+  bestN,
 }: {
   row: StandingRow;
   events: RaceEvent[];
+  bestN: number;
 }) {
   const sexTitleLabel =
     row.sex === "M" ? "Vyrų" : row.sex === "F" ? "Moterų" : null;
@@ -452,7 +459,7 @@ function RaceBreakdown({
       </div>
 
       <div className="race-breakdown-meta">
-        Top 3: {row.best3Sum}
+        Top {bestN}: {row.best3Sum}
         {" · "}
         Suma visų: {row.totalPoints}
         {row.average != null ? ` · Vid. ${Math.round(row.average)}` : ""}

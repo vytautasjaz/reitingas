@@ -20,9 +20,11 @@ function MedalBadge({ place }: { place: number }) {
 function AthleteStats({
   row,
   events,
+  bestN,
 }: {
   row: StandingRow;
   events: RaceEvent[];
+  bestN: number;
 }) {
   const sexTitleLabel =
     row.sex === "M" ? "Vyrų" : row.sex === "F" ? "Moterų" : null;
@@ -31,7 +33,7 @@ function AthleteStats({
     <div className="top-athlete-stats">
       <div className="top-athlete-meta">
         <span>
-          Top 3 <strong>{row.best3Sum}</strong>
+          Top {bestN} <strong>{row.best3Sum}</strong>
         </span>
         <span className="top-sub-sep">·</span>
         <span>
@@ -80,12 +82,14 @@ function TopRow({
   open,
   onToggle,
   events,
+  bestN,
 }: {
   row: StandingRow;
   variant: "podium" | "rest";
   open: boolean;
   onToggle: () => void;
   events: RaceEvent[];
+  bestN: number;
 }) {
   return (
     <li className={`top-item${open ? " is-open" : ""}`}>
@@ -116,7 +120,7 @@ function TopRow({
       </div>
       <div className={`top-detail${open ? " is-open" : ""}`} aria-hidden={!open}>
         <div className="top-detail-inner">
-          <AthleteStats row={row} events={events} />
+          <AthleteStats row={row} events={events} bestN={bestN} />
         </div>
       </div>
     </li>
@@ -128,6 +132,7 @@ function TopCard({
   rows,
   tone,
   events,
+  bestN,
   openId,
   onToggleAthlete,
 }: {
@@ -135,6 +140,7 @@ function TopCard({
   rows: StandingRow[];
   tone: "m" | "f";
   events: RaceEvent[];
+  bestN: number;
   openId: number | null;
   onToggleAthlete: (id: number) => void;
 }) {
@@ -162,6 +168,7 @@ function TopCard({
                 row={row}
                 variant="podium"
                 events={events}
+                bestN={bestN}
                 open={openId === row.memberId}
                 onToggle={() => onToggleAthlete(row.memberId)}
               />
@@ -177,6 +184,7 @@ function TopCard({
                     row={row}
                     variant="rest"
                     events={events}
+                    bestN={bestN}
                     open={openId === row.memberId}
                     onToggle={() => onToggleAthlete(row.memberId)}
                   />
@@ -198,6 +206,7 @@ function TopCard({
                         row={row}
                         variant="rest"
                         events={events}
+                        bestN={bestN}
                         open={openId === row.memberId}
                         onToggle={() => onToggleAthlete(row.memberId)}
                       />
@@ -245,10 +254,12 @@ export function TopAthletes({
   men,
   women,
   events,
+  bestN = 3,
 }: {
   men: StandingRow[];
   women: StandingRow[];
   events: RaceEvent[];
+  bestN?: number;
 }) {
   const [openId, setOpenId] = useState<number | null>(null);
 
@@ -264,6 +275,7 @@ export function TopAthletes({
           rows={men}
           tone="m"
           events={events}
+          bestN={bestN}
           openId={openId}
           onToggleAthlete={toggleAthlete}
         />
@@ -272,6 +284,7 @@ export function TopAthletes({
           rows={women}
           tone="f"
           events={events}
+          bestN={bestN}
           openId={openId}
           onToggleAthlete={toggleAthlete}
         />

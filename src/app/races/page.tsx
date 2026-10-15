@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { listMembers } from "@/lib/members";
 import { listMeetsWithRaces } from "@/lib/meets";
 import { getActiveSeasonYear } from "@/lib/season";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function RacesPage() {
   getDb();
   const year = await getActiveSeasonYear();
   const meets = listMeetsWithRaces(year);
+  const distances = getSettings().distances;
   const members = listMembers().map((m) => ({
     id: m.id,
     display_name: m.display_name,
@@ -33,7 +35,7 @@ export default async function RacesPage() {
           {year} m. varžybos ({meets.length})
         </h2>
         <RaceList meets={meets} />
-        <RacesEntrySection members={members} />
+        <RacesEntrySection members={members} distances={distances} />
       </section>
     </div>
   );

@@ -43,10 +43,11 @@ export function PlaceHistoryChart({
   }
 
   const width = compact ? 420 : 520;
-  const height = compact ? 158 : 180;
+  const height = compact ? 168 : 190;
   const padL = compact ? 26 : 36;
   const padR = compact ? 18 : 20;
-  const padT = compact ? 14 : 18;
+  // Extra top room so "1" labels above dots are not clipped.
+  const padT = compact ? 26 : 30;
   const padB = compact ? 54 : 56;
   const innerW = width - padL - padR;
   const innerH = height - padT - padB;
@@ -130,19 +131,23 @@ export function PlaceHistoryChart({
             );
           }
           const isLast = p.index === placed[placed.length - 1].index;
+          const cy = yAt(p.place);
+          // Keep label fully inside the SVG (place 1 sits near the top).
+          const labelYPos = Math.max(12, cy - 11);
           return (
             <g key={p.event.id}>
               <circle
                 cx={xAt(p.index)}
-                cy={yAt(p.place)}
+                cy={cy}
                 r={isLast ? 5.5 : 4}
                 className={`place-dot${isLast ? " current" : ""}`}
               />
               <text
                 x={xAt(p.index)}
-                y={yAt(p.place) - 10}
+                y={labelYPos}
                 className="place-dot-label"
                 textAnchor="middle"
+                dominantBaseline="auto"
               >
                 {p.place}
               </text>

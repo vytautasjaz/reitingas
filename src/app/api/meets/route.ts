@@ -6,6 +6,7 @@ import {
   type ManualLegInput,
   type ManualParticipantInput,
 } from "@/lib/meets";
+import { getSettings } from "@/lib/settings";
 
 export const runtime = "nodejs";
 
@@ -45,13 +46,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const allowed = new Set(getSettings().distances.map((d) => d.id));
     const legs: ManualLegInput[] = body.legs.map((leg, i) => {
-      if (
-        leg.distanceType !== "sprint" &&
-        leg.distanceType !== "olympic" &&
-        leg.distanceType !== "half" &&
-        leg.distanceType !== "full"
-      ) {
+      if (!leg.distanceType || !allowed.has(leg.distanceType)) {
         throw new Error(`Distancija ${i + 1}: neteisingas tipas`);
       }
       if (!leg.leaderTimeText?.trim()) {

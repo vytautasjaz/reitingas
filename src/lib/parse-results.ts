@@ -105,7 +105,6 @@ export function parseCompactTritonasSheet(
   }
 
   const rows: ParsedResultRow[] = [];
-  let place = 0;
   for (const raw of matrix.slice(1)) {
     const name = cellText(raw?.[0]);
     const time = cellText(raw?.[1]);
@@ -119,10 +118,9 @@ export function parseCompactTritonasSheet(
     else if (status === "dnf" || time != null) finishStatus = "dnf";
     else finishStatus = "dns";
 
-    if (finishStatus === "ok") place += 1;
-
+    // Club roster only — no protocol place / field size.
     rows.push({
-      place: finishStatus === "ok" ? place : null,
+      place: null,
       name,
       club: "TRItonas",
       time,

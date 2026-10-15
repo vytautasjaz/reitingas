@@ -7,6 +7,7 @@ import {
   bestNSumWithForeignLimit,
   type ScoredResult,
 } from "./scoring";
+import { getSettings } from "./settings";
 
 export { shortDistance };
 
@@ -266,7 +267,8 @@ function standingsFromResults(
   results: ResultRow[],
   allowedRaceIds: Set<number>,
   sexFilter: SexFilter,
-  bestN: number
+  bestN: number,
+  maxForeignInBestN = 1
 ): StandingRow[] {
   const byMember = new Map<
     number,
@@ -351,7 +353,11 @@ function standingsFromResults(
       eventCount: bucket.meetKeys.size,
       totalPoints: pointValues.reduce((a, b) => a + b, 0),
       average: averagePoints(pointValues),
-      best3Sum: bestNSumWithForeignLimit(bucket.scores, bestN),
+      best3Sum: bestNSumWithForeignLimit(
+        bucket.scores,
+        bestN,
+        maxForeignInBestN
+      ),
       pointsByRace: bucket.pointsByRace,
       detailsByRace: bucket.detailsByRace,
       change: null,
@@ -381,7 +387,8 @@ function buildCumulativeSnapshots(
   results: ResultRow[],
   events: RaceEvent[],
   sexFilter: SexFilter,
-  bestN: number
+  bestN: number,
+  maxForeignInBestN: number
 ): StandingRow[][] {
   const snapshots: StandingRow[][] = [];
   const cumulativeIds = new Set<number>();
@@ -394,7 +401,8 @@ function buildCumulativeSnapshots(
         results,
         new Set(cumulativeIds),
         sexFilter,
-        bestN
+        bestN,
+        maxForeignInBestN
       )
     );
   }
@@ -416,10 +424,13 @@ function historyFromSnapshots(
  * (all races on the same date count as one stage).
  */
 export function computeStandings(
-  bestN = 3,
+  bestN?: number,
   sexFilter: SexFilter = "all",
   year?: number
 ): StandingRow[] {
+  const settings = getSettings();
+  const n = bestN ?? settings.bestN;
+  const maxForeign = settings.maxForeignInBestN;
   const races = listRaces(year);
   const events = groupRacesIntoEvents(races, year);
   const members = loadMembers();
@@ -433,7 +444,8 @@ export function computeStandings(
     results,
     events,
     sexFilter,
-    bestN
+    n,
+    maxForeign
   );
   const snapshotsOverall = buildCumulativeSnapshots(
     members,
@@ -441,7 +453,8 @@ export function computeStandings(
     results,
     events,
     "all",
-    bestN
+    n,
+    maxForeign
   );
   const snapshotsMen = buildCumulativeSnapshots(
     members,
@@ -449,7 +462,8 @@ export function computeStandings(
     results,
     events,
     "M",
-    bestN
+    n,
+    maxForeign
   );
   const snapshotsWomen = buildCumulativeSnapshots(
     members,
@@ -457,7 +471,8 @@ export function computeStandings(
     results,
     events,
     "F",
-    bestN
+    n,
+    maxForeign
   );
 
   const current = snapshots[snapshots.length - 1];
@@ -471,7 +486,8 @@ export function computeStandings(
     results,
     new Set(races.map((r) => r.id)),
     sexFilter,
-    bestN
+    n,
+    maxForeign
   );
   const fullById = new Map(full.map((s) => [s.memberId, s]));
 
@@ -524,7 +540,7 @@ export function countStandingsBySex(year?: number): {
   M: number;
   F: number;
 } {
-  const all = computeStandings(3, "all", year);
+  const all = computeStandings(undefined, "all", year);
   return {
     all: all.length,
     M: all.filter((s) => s.sex === "M").length,
@@ -537,7 +553,7 @@ export function topStandings(
   limit?: number,
   year?: number
 ): StandingRow[] {
-  const rows = computeStandings(3, sex, year);
+  const rows = computeStandings(undefined, sex, year);
   return limit == null ? rows : rows.slice(0, limit);
 }
 

@@ -682,6 +682,7 @@ tr.detail-row td {
   max-width: 560px;
   height: auto;
   display: block;
+  overflow: visible;
 }
 
 .place-grid {
@@ -728,6 +729,10 @@ tr.detail-row td {
   fill: var(--text);
   font-size: 10px;
   font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
 
 .place-x-label {
@@ -846,6 +851,278 @@ tr.detail-row td {
   .races-entry-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.page-header-tight {
+  margin-bottom: 0.15rem;
+}
+
+.page-header-tight h1 {
+  font-size: 1.35rem;
+}
+
+.page-header-tight p {
+  margin-top: 0.15rem;
+  font-size: 0.86rem;
+}
+
+.settings-panel {
+  width: 100%;
+  max-width: 42rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.settings-block {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem 0.9rem;
+  box-shadow: var(--shadow);
+}
+
+.settings-block-rules {
+  max-width: 30rem;
+}
+
+.settings-block-distances {
+  width: 100%;
+}
+
+.settings-block-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.settings-params {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.settings-field {
+  display: grid;
+  grid-template-columns: 1fr 3.1rem;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.1rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-field:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0.15rem;
+}
+
+.settings-field-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.4rem;
+  min-width: 0;
+}
+
+.settings-field-title {
+  font-size: 0.86rem;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.settings-field-desc {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.settings-input {
+  width: 100%;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fafaf8;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.84rem;
+  line-height: 1.2;
+  padding: 0.28rem 0.4rem;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.settings-input:hover {
+  border-color: #d8d8d2;
+}
+
+.settings-input:focus {
+  border-color: var(--accent);
+  background: #fff;
+}
+
+.settings-input-center {
+  text-align: center;
+}
+
+.settings-num {
+  width: 3.1rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-panel input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.settings-panel input[type="number"]::-webkit-outer-spin-button,
+.settings-panel input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.settings-formula {
+  margin: 0.55rem 0 0;
+  padding: 0.4rem 0.55rem;
+  background: var(--accent-soft);
+  border: 1px solid rgba(111, 143, 69, 0.22);
+  border-radius: 4px;
+  font-size: 0.76rem;
+  color: #3d5230;
+}
+
+.settings-dist-table {
+  width: 100%;
+  max-width: none;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.settings-dist-table th {
+  text-align: left;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-dist-table th:nth-child(2),
+.settings-dist-table th:nth-child(3),
+.settings-dist-table td:nth-child(2),
+.settings-dist-table td:nth-child(3) {
+  text-align: center;
+}
+
+.settings-dist-table th:nth-child(1),
+.settings-dist-table td:nth-child(1) {
+  width: 54%;
+  padding-left: 0;
+}
+
+.settings-dist-table th:nth-child(2),
+.settings-dist-table td:nth-child(2) {
+  width: 18%;
+}
+
+.settings-dist-table th:nth-child(3),
+.settings-dist-table td:nth-child(3) {
+  width: 18%;
+}
+
+.settings-dist-table th:nth-child(4),
+.settings-dist-table td:nth-child(4) {
+  width: 10%;
+  padding-right: 0;
+}
+
+.settings-dist-table td {
+  padding: 0.22rem 0.3rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-dist-table tr:last-child td {
+  border-bottom: none;
+}
+
+.settings-add-row td {
+  padding-top: 0.45rem;
+}
+
+.settings-add-row .settings-input {
+  border-style: dashed;
+  background: transparent;
+}
+
+.settings-add-row .settings-input:focus {
+  border-style: solid;
+  background: #fff;
+}
+
+.settings-cell-act {
+  text-align: center;
+}
+
+.settings-cell-spacer {
+  display: inline-block;
+  width: 1.35rem;
+}
+
+.settings-icon-btn {
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settings-icon-btn:hover:not(:disabled) {
+  background: #f0f0ec;
+  color: var(--text);
+}
+
+.settings-icon-btn-add {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.settings-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.settings-msg {
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.settings-msg.ok {
+  color: var(--good);
+}
+
+.settings-msg.err {
+  color: var(--danger);
 }
 
 .manual-meet-form {
@@ -1547,7 +1824,8 @@ table.ranking td.accent-cell {
 .top-athlete-stats .place-chart-svg {
   max-width: 100%;
   height: auto;
-  max-height: 180px;
+  max-height: 200px;
+  overflow: visible;
 }
 
 .athlete-results-wrap {

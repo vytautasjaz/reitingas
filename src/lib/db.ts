@@ -38,7 +38,7 @@ function migrate(db: Database.Database) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       race_date TEXT NOT NULL,
-      distance_type TEXT NOT NULL CHECK (distance_type IN ('sprint', 'olympic', 'half', 'full')),
+      distance_type TEXT NOT NULL,
       base_points INTEGER NOT NULL,
       source_filename TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -147,7 +147,57 @@ function migrate(db: Database.Database) {
   }
 
   migrateRacesDistanceAllowFull(db);
+  migrateRacesAllowCustomDistances(db);
   backfillRaceMeets(db);
+  clearClubRosterFauxPlaces(db);
+
+  // Settings table (lazy defaults on first read).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+}
+
+/**
+ * Compact Tritonas-only imports used to store place 1..N and field_size = N.
+ * That looks like "4/17" but is only club order — strip it so UI shows "—".
+ * Full protocols keep field_size (hundreds) while only Tritonas rows are stored.
+ */
+function clearClubRosterFauxPlaces(db: Database.Database) {
+  const races = db
+    .prepare(
+      `SELECT r.id, r.field_size,
+              (SELECT COUNT(*) FROM race_results rr WHERE rr.race_id = r.id) AS result_count
+       FROM races r
+       WHERE r.field_size IS NOT NULL`
+    )
+    .all() as Array<{ id: number; field_size: number; result_count: number }>;
+
+  const clearRace = db.prepare(
+    `UPDATE races
+     SET field_size = NULL, field_size_m = NULL, field_size_f = NULL
+     WHERE id = ?`
+  );
+  const clearPlaces = db.prepare(
+    `UPDATE race_results
+     SET place = NULL, place_by_sex = NULL
+     WHERE race_id = ?`
+  );
+
+  db.transaction(() => {
+    for (const race of races) {
+      if (
+        race.result_count > 0 &&
+        race.field_size === race.result_count
+      ) {
+        clearRace.run(race.id);
+        clearPlaces.run(race.id);
+      }
+    }
+  })();
 }
 
 /** SQLite cannot ALTER CHECK — rebuild races table to allow distance_type = 'full'. */
@@ -183,6 +233,64 @@ function migrateRacesDistanceAllowFull(db: Database.Database) {
     FROM races;
     DROP TABLE races;
     ALTER TABLE races_new RENAME TO races;
+    COMMIT;
+    PRAGMA foreign_keys = ON;
+  `);
+}
+
+/** Drop distance_type CHECK so custom distances (aquathlon, …) are allowed. */
+function migrateRacesAllowCustomDistances(db: Database.Database) {
+  const row = db
+    .prepare(
+      `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'races'`
+    )
+    .get() as { sql: string } | undefined;
+  if (!row?.sql) return;
+  if (!/CHECK\s*\(\s*distance_type/i.test(row.sql)) return;
+
+  const oldCols = new Set(
+    (
+      db.prepare("PRAGMA table_info(races)").all() as Array<{ name: string }>
+    ).map((c) => c.name)
+  );
+  const newCols = [
+    "id",
+    "name",
+    "race_date",
+    "distance_type",
+    "base_points",
+    "source_filename",
+    "created_at",
+    "leader_time_seconds",
+    "meet_id",
+    "field_size",
+    "field_size_m",
+    "field_size_f",
+  ];
+  const shared = newCols.filter((c) => oldCols.has(c));
+  const list = shared.join(", ");
+
+  db.exec(`
+    PRAGMA foreign_keys = OFF;
+    BEGIN;
+    CREATE TABLE races_anydist (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      race_date TEXT NOT NULL,
+      distance_type TEXT NOT NULL,
+      base_points INTEGER NOT NULL,
+      source_filename TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      leader_time_seconds REAL,
+      meet_id INTEGER REFERENCES race_meets(id) ON DELETE CASCADE,
+      field_size INTEGER,
+      field_size_m INTEGER,
+      field_size_f INTEGER
+    );
+    INSERT INTO races_anydist (${list})
+    SELECT ${list} FROM races;
+    DROP TABLE races;
+    ALTER TABLE races_anydist RENAME TO races;
     COMMIT;
     PRAGMA foreign_keys = ON;
   `);

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DistanceType } from "@/lib/distances";
+import type { DistanceSetting } from "@/lib/settings";
+import { DistanceSelect } from "./DistanceSelect";
 
 type LegRow = {
   key: string;
@@ -30,7 +32,7 @@ function newLeg(distanceType: DistanceType = "olympic"): LegRow {
   };
 }
 
-export function ImportForm() {
+export function ImportForm({ distances }: { distances: DistanceSetting[] }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<ImportResponse | null>(null);
@@ -163,21 +165,14 @@ export function ImportForm() {
                   <label className="label" htmlFor={`dist-${leg.key}`}>
                     Distancija
                   </label>
-                  <select
+                  <DistanceSelect
                     id={`dist-${leg.key}`}
-                    className="select"
                     value={leg.distanceType}
-                    onChange={(e) =>
-                      updateLeg(leg.key, {
-                        distanceType: e.target.value as DistanceType,
-                      })
+                    distances={distances}
+                    onChange={(distanceType) =>
+                      updateLeg(leg.key, { distanceType })
                     }
-                  >
-                    <option value="sprint">Sprint / SD — 900</option>
-                    <option value="olympic">Olimpinė / OD — 1000</option>
-                    <option value="half">Half — 1100</option>
-                    <option value="full">Full — 1100</option>
-                  </select>
+                  />
                 </div>
                 <div style={{ flex: 1, minWidth: 180 }}>
                   <label className="label" htmlFor={`file-${leg.key}`}>

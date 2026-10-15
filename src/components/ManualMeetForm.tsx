@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { DistanceType } from "@/lib/distances";
 import { analyzePaste } from "@/lib/manual-paste";
+import type { DistanceSetting } from "@/lib/settings";
+import { DistanceSelect } from "./DistanceSelect";
 
 type MemberOption = { id: number; display_name: string };
 
@@ -52,7 +54,13 @@ function newLeg(distanceType: DistanceType = "olympic"): LegRow {
   };
 }
 
-export function ManualMeetForm({ members }: { members: MemberOption[] }) {
+export function ManualMeetForm({
+  members,
+  distances,
+}: {
+  members: MemberOption[];
+  distances: DistanceSetting[];
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -360,21 +368,14 @@ export function ManualMeetForm({ members }: { members: MemberOption[] }) {
                     <label className="label" htmlFor={`manual-dist-${leg.key}`}>
                       Distancija
                     </label>
-                    <select
-                      id={`manual-dist-${leg.key}`}
-                      className="select"
-                      value={leg.distanceType}
-                      onChange={(e) =>
-                        updateLeg(leg.key, {
-                          distanceType: e.target.value as DistanceType,
-                        })
-                      }
-                    >
-                      <option value="sprint">Sprint / SD — 900</option>
-                      <option value="olympic">Olimpinė / OD — 1000</option>
-                      <option value="half">Half — 1100</option>
-                      <option value="full">Full — 1100</option>
-                    </select>
+                  <DistanceSelect
+                    id={`manual-dist-${leg.key}`}
+                    value={leg.distanceType}
+                    distances={distances}
+                    onChange={(distanceType) =>
+                      updateLeg(leg.key, { distanceType })
+                    }
+                  />
                   </div>
                   <div>
                     <label className="label" htmlFor={`manual-leader-${leg.key}`}>

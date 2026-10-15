@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { DistanceType } from "@/lib/distances";
+import type { DistanceSetting } from "@/lib/settings";
 import { formatSeconds } from "@/lib/time-format";
+import { DistanceSelect } from "./DistanceSelect";
 
 export type EditableRace = {
   id: number;
@@ -34,10 +36,12 @@ export function RaceEditForm({
   race,
   results,
   members,
+  distances,
 }: {
   race: EditableRace;
   results: EditableResult[];
   members: EditableMember[];
+  distances: DistanceSetting[];
 }) {
   const router = useRouter();
   const [name, setName] = useState(race.name);
@@ -200,17 +204,12 @@ export function RaceEditForm({
           <label className="label" htmlFor="edit-distance">
             Distancija (baziniai taškai)
           </label>
-          <select
+          <DistanceSelect
             id="edit-distance"
-            className="select"
             value={distanceType}
-            onChange={(e) => setDistanceType(e.target.value as DistanceType)}
-          >
-            <option value="sprint">Sprint — 900</option>
-            <option value="olympic">Olimpinė — 1000</option>
-            <option value="half">Half — 1100</option>
-            <option value="full">Full — 1100</option>
-          </select>
+            distances={distances}
+            onChange={setDistanceType}
+          />
         </div>
 
         <div>

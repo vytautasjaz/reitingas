@@ -4,6 +4,7 @@ import { RaceEditForm } from "@/components/RaceEditForm";
 import { getDb } from "@/lib/db";
 import { listMembers } from "@/lib/members";
 import { getRace, getRaceResults } from "@/lib/ranking";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function RaceEditPage({
 
   const results = getRaceResults(raceId);
   const members = listMembers();
+  const distances = getSettings().distances;
 
   return (
     <div>
@@ -45,7 +47,12 @@ export default async function RaceEditPage({
         </div>
       </div>
 
-      <RaceEditForm race={race} results={results} members={members} />
+      <RaceEditForm
+        race={race}
+        results={results}
+        members={members}
+        distances={distances}
+      />
     </div>
   );
 }

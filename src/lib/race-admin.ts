@@ -1,18 +1,29 @@
 import {
   getDb,
   DistanceType,
-  BASE_POINTS,
   Race,
   RaceResult,
   Member,
 } from "./db";
 import { ensureMember } from "./members";
 import {
-  calculatePoints,
   classifyFinishStatus,
   parseTimeToSeconds,
 } from "./scoring";
 import { Sex } from "./gender";
+import {
+  basePointsForDistanceId,
+  getSettings,
+  scoreAthlete,
+} from "./settings";
+
+function raceIsForeign(race: Race): boolean {
+  if (race.meet_id == null) return false;
+  const meet = getDb()
+    .prepare("SELECT foreign_start FROM race_meets WHERE id = ?")
+    .get(race.meet_id) as { foreign_start: number } | undefined;
+  return !!meet?.foreign_start;
+}
 
 export type UpdateRaceInput = {
   name: string;
@@ -107,6 +118,16 @@ export function recalculateRacePoints(raceId: number): void {
   const leader = resolveLeaderTime(race);
   if (leader == null) return;
 
+  const meet = race.meet_id
+    ? (db
+        .prepare("SELECT foreign_start FROM race_meets WHERE id = ?")
+        .get(race.meet_id) as { foreign_start: number } | undefined)
+    : undefined;
+  const foreign = !!meet?.foreign_start;
+  const settings = getSettings();
+  const base = basePointsForDistanceId(race.distance_type, settings);
+  db.prepare("UPDATE races SET base_points = ? WHERE id = ?").run(base, raceId);
+
   const rows = db
     .prepare("SELECT * FROM race_results WHERE race_id = ?")
     .all(raceId) as RaceResult[];
@@ -132,7 +153,7 @@ export function recalculateRacePoints(raceId: number): void {
         continue;
       }
       updateStatus.run(
-        calculatePoints(leader, secs, race.base_points),
+        scoreAthlete(leader, secs, race.distance_type, foreign, settings),
         "ok",
         row.id
       );
@@ -147,7 +168,7 @@ export function updateRace(raceId: number, input: UpdateRaceInput): Race {
     | undefined;
   if (!existing) throw new Error("Varžybos nerastos");
 
-  const base = BASE_POINTS[input.distanceType];
+  const base = basePointsForDistanceId(input.distanceType);
   const distanceChanged = existing.distance_type !== input.distanceType;
   const leader =
     input.leaderTimeSeconds !== undefined
@@ -282,7 +303,12 @@ export function updateRaceResult(
         "Nėra lyderio laiko — įveskite taškus rankiniu būdu"
       );
     }
-    points = calculatePoints(leader, timeSeconds, race.base_points);
+    points = scoreAthlete(
+      leader,
+      timeSeconds,
+      race.distance_type,
+      raceIsForeign(race)
+    );
     finishStatus = "ok";
   }
 
@@ -369,7 +395,12 @@ export function addManualResult(
         "Nėra lyderio laiko — įveskite taškus rankiniu būdu arba lyderio laiką"
       );
     }
-    points = calculatePoints(leader, timeSeconds, race.base_points);
+    points = scoreAthlete(
+      leader,
+      timeSeconds,
+      race.distance_type,
+      raceIsForeign(race)
+    );
     finishStatus = "ok";
   }
 

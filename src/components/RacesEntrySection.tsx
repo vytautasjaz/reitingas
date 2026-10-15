@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { DistanceSetting } from "@/lib/settings";
 import { ImportForm } from "./ImportForm";
 import { ManualMeetForm } from "./ManualMeetForm";
 
@@ -8,7 +9,13 @@ type Mode = "closed" | "choose" | "import" | "manual";
 
 type MemberOption = { id: number; display_name: string };
 
-export function RacesEntrySection({ members }: { members: MemberOption[] }) {
+export function RacesEntrySection({
+  members,
+  distances,
+}: {
+  members: MemberOption[];
+  distances: DistanceSetting[];
+}) {
   const [mode, setMode] = useState<Mode>("closed");
 
   if (mode === "closed") {
@@ -79,9 +86,9 @@ export function RacesEntrySection({ members }: { members: MemberOption[] }) {
         </button>
       </div>
       {mode === "import" ? (
-        <ImportForm />
+        <ImportForm distances={distances} />
       ) : (
-        <ManualMeetForm members={members} />
+        <ManualMeetForm members={members} distances={distances} />
       )}
     </div>
   );
