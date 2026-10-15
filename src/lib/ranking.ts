@@ -7,6 +7,7 @@ import {
   bestNSumWithForeignLimit,
   type ScoredResult,
 } from "./scoring";
+import { ensureOfficialRosterApplied } from "./members";
 import { getSettings } from "./settings";
 
 export { shortDistance };
@@ -231,6 +232,8 @@ type ResultRow = {
 };
 
 function loadMembers(): MemberRow[] {
+  // Keep production volume DB aligned with the official roster after deploys.
+  ensureOfficialRosterApplied();
   return getDb()
     .prepare("SELECT id, display_name, sex FROM members WHERE active = 1")
     .all() as MemberRow[];

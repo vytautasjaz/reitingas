@@ -10,12 +10,10 @@ export default function SettingsPage() {
   const formula = formulaDescription(settings);
 
   return (
-    <div className="space-y-5">
-      <div className="page-header">
-        <div>
-          <h1>Nustatymai</h1>
-          <p>Reitingo taisyklės ir distancijų bazės. Išsaugojus taškai perskaičiuojami.</p>
-        </div>
+    <div className="settings-page">
+      <div className="settings-page-header">
+        <h1>Nustatymai</h1>
+        <p>Taisyklės ir bazės — išsaugojus rezultatai perskaičiuojami.</p>
       </div>
       <SettingsForm initial={settings} initialFormula={formula} />
     </div>

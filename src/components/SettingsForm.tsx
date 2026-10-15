@@ -4,6 +4,78 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { AppSettings, DistanceSetting } from "@/lib/settings";
 
+function InfoIcon({ title }: { title: string }) {
+  return (
+    <span className="settings-info" title={title} aria-label={title}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M12 11v5.5"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+        <circle cx="12" cy="8" r="1" fill="currentColor" />
+      </svg>
+    </span>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7h12Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 11v6M14 11v6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 5v14M5 12h14"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect
+        x="9"
+        y="9"
+        width="11"
+        height="11"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <path
+        d="M5 15V5a2 2 0 0 1 2-2h10"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function SettingsForm({
   initial,
   initialFormula,
@@ -17,6 +89,7 @@ export function SettingsForm({
   const [pending, setPending] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const [newLabel, setNewLabel] = useState("");
   const [newShort, setNewShort] = useState("");
@@ -31,7 +104,7 @@ export function SettingsForm({
       settings.foreignBonusPercent > 0
         ? ` × ${(1 + settings.foreignBonusPercent / 100).toFixed(2)} užs.`
         : "";
-    return `taškai = ROUND(${exp} × bazė${foreign})`;
+    return `ROUND( ${exp} × bazė${foreign} )`;
   }, [settings.formulaExponent, settings.foreignBonusPercent]);
 
   function updateDistance(id: string, patch: Partial<DistanceSetting>) {
@@ -41,6 +114,16 @@ export function SettingsForm({
         d.id === id ? { ...d, ...patch } : d
       ),
     }));
+  }
+
+  async function copyFormula() {
+    try {
+      await navigator.clipboard.writeText(previewFormula);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
   }
 
   async function save() {
@@ -155,19 +238,19 @@ export function SettingsForm({
   }
 
   return (
-    <div className="settings-panel">
-      <section className="card settings-card">
-        <div className="settings-card-head">
-          <h2>Reitingas</h2>
-          <p>Kaip skaičiuojama sezono suma ir taškai.</p>
-        </div>
-
-        <div className="settings-rules-grid">
-          <label className="settings-rule">
-            <span className="settings-rule-label">Geriausi etapai</span>
-            <span className="settings-rule-hint">Top N į bendrą sumą</span>
+    <div className="settings-shell">
+      <div className="settings-card">
+        <div className="settings-params">
+          <label className="settings-row">
+            <span className="settings-row-main">
+              <span className="settings-row-title">
+                Kiek geriausių etapų įskaitoma
+                <InfoIcon title="Kiek geriausių startų įeina į bendrą sezono sumą" />
+              </span>
+              <span className="settings-row-hint">Top N į bendrą sumą</span>
+            </span>
             <input
-              className="input settings-rule-input font-mono"
+              className="settings-num"
               type="number"
               min={1}
               max={20}
@@ -181,11 +264,16 @@ export function SettingsForm({
             />
           </label>
 
-          <label className="settings-rule">
-            <span className="settings-rule-label">Užsienio limitas</span>
-            <span className="settings-rule-hint">kiek iš Top N</span>
+          <label className="settings-row">
+            <span className="settings-row-main">
+              <span className="settings-row-title">
+                Kiek užsienio startų galima įskaityti
+                <InfoIcon title="Iš Top N į sumą gali įeiti tiek užsienio startų" />
+              </span>
+              <span className="settings-row-hint">Iš Top N</span>
+            </span>
             <input
-              className="input settings-rule-input font-mono"
+              className="settings-num"
               type="number"
               min={0}
               max={10}
@@ -199,11 +287,16 @@ export function SettingsForm({
             />
           </label>
 
-          <label className="settings-rule">
-            <span className="settings-rule-label">Užsienio priedas</span>
-            <span className="settings-rule-hint">procentais, pvz. 10</span>
+          <label className="settings-row">
+            <span className="settings-row-main">
+              <span className="settings-row-title">
+                Užsienio starto taškų priedas
+                <InfoIcon title="Papildomi procentai užsienio starto taškams" />
+              </span>
+              <span className="settings-row-hint">%, pvz. 10 = +10 %</span>
+            </span>
             <input
-              className="input settings-rule-input font-mono"
+              className="settings-num"
               type="number"
               min={0}
               max={100}
@@ -217,11 +310,16 @@ export function SettingsForm({
             />
           </label>
 
-          <label className="settings-rule">
-            <span className="settings-rule-label">Eksponentė</span>
-            <span className="settings-rule-hint">1 = lyderis / dalyvis</span>
+          <label className="settings-row">
+            <span className="settings-row-main">
+              <span className="settings-row-title">
+                Formulės eksponentė
+                <InfoIcon title="1 = tiesioginis santykis lyderis / dalyvis" />
+              </span>
+              <span className="settings-row-hint">1 = lyderis / dalyvis</span>
+            </span>
             <input
-              className="input settings-rule-input font-mono"
+              className="settings-num"
               type="number"
               min={0.1}
               max={5}
@@ -237,131 +335,123 @@ export function SettingsForm({
           </label>
         </div>
 
-        <div className="settings-formula font-mono" title={formula}>
-          {previewFormula}
+        <div className="settings-formula-box">
+          <div className="settings-formula-head">
+            <span>Skaičiavimo formulė</span>
+            <button
+              type="button"
+              className="settings-icon-btn"
+              onClick={copyFormula}
+              title={copied ? "Nukopijuota" : "Kopijuoti"}
+            >
+              <CopyIcon />
+            </button>
+          </div>
+          <code className="settings-formula-code" title={formula}>
+            {previewFormula}
+          </code>
         </div>
-      </section>
 
-      <section className="card table-wrap settings-card">
-        <div className="settings-card-head settings-card-head-pad">
-          <h2>Distancijos</h2>
-          <p>Bazė naudojama taškų formulei. Galite pridėti savo tipus.</p>
-        </div>
-
-        <table className="ranking settings-dist-table">
-          <thead>
-            <tr>
-              <th>Pavadinimas</th>
-              <th>Trump.</th>
-              <th>Bazė</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
+        <div className="settings-dist-block">
+          <div className="settings-dist-head">
+            <span>Distancija</span>
+            <span>Trump.</span>
+            <span>Bazė</span>
+            <span />
+          </div>
+          <div className="settings-dist-rows">
             {settings.distances.map((d) => (
-              <tr key={d.id}>
-                <td>
-                  <input
-                    className="input settings-cell-input"
-                    value={d.label}
-                    onChange={(e) =>
-                      updateDistance(d.id, { label: e.target.value })
-                    }
-                    aria-label={`${d.id} pavadinimas`}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="input settings-cell-input settings-cell-center font-mono"
-                    value={d.shortLabel}
-                    onChange={(e) =>
-                      updateDistance(d.id, { shortLabel: e.target.value })
-                    }
-                    aria-label={`${d.id} trumpinys`}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="input settings-cell-input settings-cell-center font-mono"
-                    type="number"
-                    min={1}
-                    value={d.basePoints}
-                    onChange={(e) =>
-                      updateDistance(d.id, {
-                        basePoints: Number(e.target.value) || 1,
-                      })
-                    }
-                    aria-label={`${d.id} bazė`}
-                  />
-                </td>
-                <td className="settings-cell-act">
-                  {!d.builtin ? (
-                    <button
-                      type="button"
-                      className="btn btn-ghost text-sm"
-                      disabled={pending}
-                      onClick={() => removeDistance(d.id)}
-                    >
-                      Ištrinti
-                    </button>
-                  ) : (
-                    <span className="muted text-sm">įmont.</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-            <tr className="settings-add-row">
-              <td>
+              <div key={d.id} className="settings-dist-row">
                 <input
-                  className="input settings-cell-input"
-                  placeholder="Akvatlonas…"
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
+                  className="settings-field"
+                  value={d.label}
+                  onChange={(e) =>
+                    updateDistance(d.id, { label: e.target.value })
+                  }
+                  aria-label={`${d.id} pavadinimas`}
                 />
-              </td>
-              <td>
                 <input
-                  className="input settings-cell-input settings-cell-center font-mono"
-                  placeholder="AQ"
-                  value={newShort}
-                  onChange={(e) => setNewShort(e.target.value)}
+                  className="settings-field settings-field-center"
+                  value={d.shortLabel}
+                  onChange={(e) =>
+                    updateDistance(d.id, { shortLabel: e.target.value })
+                  }
+                  aria-label={`${d.id} trumpinys`}
                 />
-              </td>
-              <td>
                 <input
-                  className="input settings-cell-input settings-cell-center font-mono"
+                  className="settings-field settings-field-center font-mono"
                   type="number"
                   min={1}
-                  value={newBase}
-                  onChange={(e) => setNewBase(e.target.value)}
+                  value={d.basePoints}
+                  onChange={(e) =>
+                    updateDistance(d.id, {
+                      basePoints: Number(e.target.value) || 1,
+                    })
+                  }
+                  aria-label={`${d.id} bazė`}
                 />
-              </td>
-              <td className="settings-cell-act">
-                <button
-                  type="button"
-                  className="btn btn-ghost text-sm"
-                  disabled={pending || !newLabel.trim()}
-                  onClick={addDistance}
-                >
-                  Pridėti
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+                {d.builtin ? (
+                  <span className="settings-icon-btn settings-icon-btn-ghost" />
+                ) : (
+                  <button
+                    type="button"
+                    className="settings-icon-btn settings-icon-btn-danger"
+                    disabled={pending}
+                    onClick={() => removeDistance(d.id)}
+                    title="Ištrinti"
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
+              </div>
+            ))}
 
-      <div className="settings-actions">
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={pending}
-          onClick={save}
-        >
-          {pending ? "Saugoma…" : "Išsaugoti ir perskaičiuoti"}
-        </button>
-        {msg && <span className="settings-msg ok">{msg}</span>}
-        {error && <span className="settings-msg err">{error}</span>}
+            <div className="settings-dist-row settings-dist-row-add">
+              <input
+                className="settings-field"
+                placeholder="Nauja (pvz. Akvatlonas)"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+              />
+              <input
+                className="settings-field settings-field-center"
+                placeholder="AQ"
+                value={newShort}
+                onChange={(e) => setNewShort(e.target.value)}
+              />
+              <input
+                className="settings-field settings-field-center font-mono"
+                type="number"
+                min={1}
+                value={newBase}
+                onChange={(e) => setNewBase(e.target.value)}
+              />
+              <button
+                type="button"
+                className="settings-icon-btn settings-icon-btn-add"
+                disabled={pending || !newLabel.trim()}
+                onClick={addDistance}
+                title="Pridėti"
+              >
+                <PlusIcon />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-footer">
+          <button
+            type="button"
+            className="settings-save"
+            disabled={pending}
+            onClick={save}
+          >
+            {pending ? "Saugoma…" : "Išsaugoti ir perskaičiuoti"}
+            {!pending && <span aria-hidden>→</span>}
+          </button>
+          {msg && <span className="settings-msg ok">{msg}</span>}
+          {error && <span className="settings-msg err">{error}</span>}
+        </div>
       </div>
     </div>
   );

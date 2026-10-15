@@ -2,7 +2,11 @@
  * Official TRItonas club roster for the rating.
  * Only these athletes can be included in the ranking.
  * Protocol rows for others may still be stored for history.
+ *
+ * Bump ROSTER_SYNC_VERSION when the list changes so production DBs re-sync on boot.
  */
+export const ROSTER_SYNC_VERSION = "2026-10-15-v1";
+
 export const OFFICIAL_ROSTER: readonly string[] = [
   "Airidas Gražinskis",
   "Aistė Alda Kasinskienė",

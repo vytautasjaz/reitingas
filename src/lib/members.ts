@@ -4,10 +4,46 @@ import * as XLSX from "xlsx";
 import {
   OFFICIAL_ROSTER,
   ROSTER_ALIASES,
+  ROSTER_SYNC_VERSION,
 } from "@/data/official-roster";
 import { getDb, Member } from "./db";
 import { inferSexFromName, Sex } from "./gender";
 import { normalizeName, toDisplayName } from "./names";
+
+const ROSTER_SYNC_KEY = "official_roster_version";
+let rosterSyncDone = false;
+
+/**
+ * Apply official roster to the DB once per process (and again after roster version bumps).
+ * Deploy updates code only — Fly volume DB needs this to catch up.
+ */
+export function ensureOfficialRosterApplied(): void {
+  if (rosterSyncDone) return;
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  const row = db
+    .prepare("SELECT value FROM app_settings WHERE key = ?")
+    .get(ROSTER_SYNC_KEY) as { value: string } | undefined;
+  if (row?.value === ROSTER_SYNC_VERSION) {
+    rosterSyncDone = true;
+    return;
+  }
+  syncOfficialRoster();
+  db.prepare(
+    `INSERT INTO app_settings (key, value, updated_at)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET
+       value = excluded.value,
+       updated_at = datetime('now')`
+  ).run(ROSTER_SYNC_KEY, ROSTER_SYNC_VERSION);
+  rosterSyncDone = true;
+}
 
 export function findMemberByName(rawName: string): Member | undefined {
   const db = getDb();
@@ -100,6 +136,7 @@ export function ensureMember(rawName: string, sex?: Sex | null): Member {
 }
 
 export function listMembers(): Member[] {
+  ensureOfficialRosterApplied();
   const db = getDb();
   return db
     .prepare(
