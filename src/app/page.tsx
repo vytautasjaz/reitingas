@@ -26,9 +26,9 @@ export default async function HomePage() {
       <div className="page-header">
         <div>
           <h1>Bendra įskaita {year}</h1>
-          <p>
-            Vieta pagal 3 geriausių varžybų taškų sumą. Pokytis skaičiuojamas pagal
-            etapą (ta pati diena = vienas etapas, net jei OD ir SD atskiri failai).
+          <p className="page-lead">
+            3 geriausių etapų suma · pokytis nuo praėjusio etapo · OD ir SD tą
+            pačią dieną skaitomi kaip vienas etapas
           </p>
         </div>
       </div>

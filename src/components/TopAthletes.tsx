@@ -127,7 +127,6 @@ function TopCard({
   title,
   rows,
   tone,
-  expanded,
   events,
   openId,
   onToggleAthlete,
@@ -135,14 +134,15 @@ function TopCard({
   title: string;
   rows: StandingRow[];
   tone: "m" | "f";
-  expanded: boolean;
   events: RaceEvent[];
   openId: number | null;
   onToggleAthlete: (id: number) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const podium = rows.slice(0, 3);
   const previewRest = rows.slice(3, PREVIEW);
   const more = rows.slice(PREVIEW);
+  const canExpand = more.length > 0;
   const label = expanded ? `Visas sąrašas · ${rows.length}` : "Top 10";
 
   return (
@@ -184,26 +184,56 @@ function TopCard({
               </ol>
             </>
           )}
-          {more.length > 0 && (
-            <div
-              className={`top-more${expanded ? " is-open" : ""}`}
-              aria-hidden={!expanded}
-            >
-              <div className="top-more-inner">
-                <ol className="top-list top-list-rest" start={PREVIEW + 1}>
-                  {more.map((row) => (
-                    <TopRow
-                      key={row.memberId}
-                      row={row}
-                      variant="rest"
-                      events={events}
-                      open={openId === row.memberId}
-                      onToggle={() => onToggleAthlete(row.memberId)}
-                    />
-                  ))}
-                </ol>
+          {canExpand && (
+            <>
+              <div
+                className={`top-more${expanded ? " is-open" : ""}`}
+                aria-hidden={!expanded}
+              >
+                <div className="top-more-inner">
+                  <ol className="top-list top-list-rest" start={PREVIEW + 1}>
+                    {more.map((row) => (
+                      <TopRow
+                        key={row.memberId}
+                        row={row}
+                        variant="rest"
+                        events={events}
+                        open={openId === row.memberId}
+                        onToggle={() => onToggleAthlete(row.memberId)}
+                      />
+                    ))}
+                  </ol>
+                </div>
               </div>
-            </div>
+              <button
+                type="button"
+                className={`top-expand-btn top-expand-btn-inline${expanded ? " is-open" : ""}`}
+                aria-expanded={expanded}
+                onClick={() => setExpanded((v) => !v)}
+              >
+                <span>
+                  {expanded
+                    ? "Suskleisti"
+                    : `Rodyti daugiau · +${more.length}`}
+                </span>
+                <svg
+                  className="top-expand-chevron"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 12 12"
+                  aria-hidden
+                >
+                  <path
+                    d="M2.5 4.5 L6 8 L9.5 4.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </>
           )}
         </>
       )}
@@ -220,9 +250,7 @@ export function TopAthletes({
   women: StandingRow[];
   events: RaceEvent[];
 }) {
-  const [listExpanded, setListExpanded] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
-  const canExpand = men.length > PREVIEW || women.length > PREVIEW;
 
   function toggleAthlete(id: number) {
     setOpenId((prev) => (prev === id ? null : id));
@@ -235,7 +263,6 @@ export function TopAthletes({
           title="Vyrai"
           rows={men}
           tone="m"
-          expanded={listExpanded}
           events={events}
           openId={openId}
           onToggleAthlete={toggleAthlete}
@@ -244,38 +271,11 @@ export function TopAthletes({
           title="Moterys"
           rows={women}
           tone="f"
-          expanded={listExpanded}
           events={events}
           openId={openId}
           onToggleAthlete={toggleAthlete}
         />
       </div>
-      {canExpand && (
-        <button
-          type="button"
-          className={`top-expand-btn${listExpanded ? " is-open" : ""}`}
-          aria-expanded={listExpanded}
-          onClick={() => setListExpanded((v) => !v)}
-        >
-          <span>{listExpanded ? "Suskleisti" : "Rodyti viską"}</span>
-          <svg
-            className="top-expand-chevron"
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            aria-hidden
-          >
-            <path
-              d="M2.5 4.5 L6 8 L9.5 4.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      )}
     </div>
   );
 }

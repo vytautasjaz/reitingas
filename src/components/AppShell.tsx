@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { BrandMarks } from "./BrandMarks";
 import { SeasonSwitcher } from "./SeasonSwitcher";
 
@@ -60,10 +61,69 @@ export function AppShell({
   seasonYears: number[];
 }) {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={`app-shell${menuOpen ? " menu-open" : ""}`}>
+      <header className="mobile-topbar">
+        <Link href="/" className="mobile-topbar-brand" aria-label="TRItonas reitingas">
+          <Image
+            src="/brand/logo-negative.png"
+            alt="TRItonas"
+            width={120}
+            height={120}
+            className="mobile-topbar-logo"
+            priority
+          />
+        </Link>
+        <button
+          type="button"
+          className="mobile-nav-toggle"
+          aria-expanded={menuOpen}
+          aria-controls="app-sidebar"
+          aria-label={menuOpen ? "Uždaryti meniu" : "Atidaryti meniu"}
+          onClick={() => setMenuOpen((v) => !v)}
+        >
+          <span className="hamburger" aria-hidden>
+            <span />
+            <span />
+            <span />
+          </span>
+        </button>
+      </header>
+
+      <div
+        className="sidebar-backdrop"
+        aria-hidden={!menuOpen}
+        onClick={() => setMenuOpen(false)}
+      />
+
+      <aside id="app-sidebar" className="sidebar">
+        <button
+          type="button"
+          className="sidebar-close"
+          aria-label="Uždaryti meniu"
+          onClick={() => setMenuOpen(false)}
+        >
+          <span aria-hidden>×</span>
+        </button>
         <Link href="/" className="sidebar-brand" aria-label="TRItonas reitingas">
           <Image
             src="/brand/logo-negative.png"
