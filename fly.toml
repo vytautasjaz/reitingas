@@ -26,5 +26,5 @@ primary_region = 'ams'
   cpus = 1
 
 [mounts]
-  source = 'reitingas_data'
+  source = 'data'
   destination = '/data'
