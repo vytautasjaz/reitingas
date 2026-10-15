@@ -11,7 +11,99 @@ import { inferSexFromName, Sex } from "./gender";
 import { normalizeName, toDisplayName } from "./names";
 
 const ROSTER_SYNC_KEY = "official_roster_version";
+const EXTRA_ROSTER_KEY = "roster_extras";
+const EXCLUDED_ROSTER_KEY = "roster_excluded";
 let rosterSyncDone = false;
+
+function ensureAppSettingsTable(): void {
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+}
+
+function readJsonSetting<T>(key: string, fallback: T): T {
+  ensureAppSettingsTable();
+  const row = getDb()
+    .prepare("SELECT value FROM app_settings WHERE key = ?")
+    .get(key) as { value: string } | undefined;
+  if (!row?.value) return fallback;
+  try {
+    return JSON.parse(row.value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJsonSetting(key: string, value: unknown): void {
+  ensureAppSettingsTable();
+  getDb()
+    .prepare(
+      `INSERT INTO app_settings (key, value, updated_at)
+       VALUES (?, ?, datetime('now'))
+       ON CONFLICT(key) DO UPDATE SET
+         value = excluded.value,
+         updated_at = datetime('now')`
+    )
+    .run(key, JSON.stringify(value));
+}
+
+/** Extra rated members added via UI (persist across sync / deploy). */
+export function getExtraRosterNames(): string[] {
+  const raw = readJsonSetting<unknown>(EXTRA_ROSTER_KEY, []);
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((n) => String(n ?? "").trim())
+    .filter(Boolean);
+}
+
+function setExtraRosterNames(names: string[]): void {
+  const unique = new Map<string, string>();
+  for (const n of names) {
+    const display = toDisplayName(n.trim());
+    const key = normalizeName(display);
+    if (!key) continue;
+    unique.set(key, display);
+  }
+  writeJsonSetting(EXTRA_ROSTER_KEY, [...unique.values()]);
+}
+
+/** Official-list names removed via UI (normalized keys). */
+function getExcludedRosterKeys(): Set<string> {
+  const raw = readJsonSetting<unknown>(EXCLUDED_ROSTER_KEY, []);
+  if (!Array.isArray(raw)) return new Set();
+  return new Set(
+    raw.map((n) => normalizeName(String(n ?? ""))).filter(Boolean)
+  );
+}
+
+function setExcludedRosterKeys(keys: Set<string>): void {
+  writeJsonSetting(EXCLUDED_ROSTER_KEY, [...keys]);
+}
+
+/** Built-in roster + UI extras − UI exclusions. */
+export function getEffectiveRoster(): string[] {
+  const excluded = getExcludedRosterKeys();
+  const out = new Map<string, string>();
+  for (const raw of OFFICIAL_ROSTER) {
+    const display = toDisplayName(raw.trim());
+    const key = normalizeName(display);
+    if (!key || excluded.has(key)) continue;
+    out.set(key, display);
+  }
+  for (const raw of getExtraRosterNames()) {
+    const display = toDisplayName(raw.trim());
+    const key = normalizeName(display);
+    if (!key) continue;
+    out.set(key, display);
+  }
+  return [...out.values()].sort((a, b) =>
+    a.localeCompare(b, "lt", { sensitivity: "base" })
+  );
+}
 
 /**
  * Apply official roster to the DB once per process (and again after roster version bumps).
@@ -19,15 +111,8 @@ let rosterSyncDone = false;
  */
 export function ensureOfficialRosterApplied(): void {
   if (rosterSyncDone) return;
-  const db = getDb();
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
-  const row = db
+  ensureAppSettingsTable();
+  const row = getDb()
     .prepare("SELECT value FROM app_settings WHERE key = ?")
     .get(ROSTER_SYNC_KEY) as { value: string } | undefined;
   if (row?.value === ROSTER_SYNC_VERSION) {
@@ -35,13 +120,16 @@ export function ensureOfficialRosterApplied(): void {
     return;
   }
   syncOfficialRoster();
-  db.prepare(
-    `INSERT INTO app_settings (key, value, updated_at)
-     VALUES (?, ?, datetime('now'))
-     ON CONFLICT(key) DO UPDATE SET
-       value = excluded.value,
-       updated_at = datetime('now')`
-  ).run(ROSTER_SYNC_KEY, ROSTER_SYNC_VERSION);
+  ensureAppSettingsTable();
+  getDb()
+    .prepare(
+      `INSERT INTO app_settings (key, value, updated_at)
+       VALUES (?, ?, datetime('now'))
+       ON CONFLICT(key) DO UPDATE SET
+         value = excluded.value,
+         updated_at = datetime('now')`
+    )
+    .run(ROSTER_SYNC_KEY, ROSTER_SYNC_VERSION);
   rosterSyncDone = true;
 }
 
@@ -196,6 +284,83 @@ export function deactivateMember(id: number): void {
   const existing = getMember(id);
   if (!existing) throw new Error("Narys nerastas");
   db.prepare("UPDATE members SET active = 0 WHERE id = ?").run(id);
+
+  // Keep sync from bringing them back / drop from UI extras.
+  const key = existing.normalized_name;
+  setExtraRosterNames(
+    getExtraRosterNames().filter((n) => normalizeName(n) !== key)
+  );
+  const excluded = getExcludedRosterKeys();
+  excluded.add(key);
+  setExcludedRosterKeys(excluded);
+
+  db.prepare(
+    `UPDATE race_results
+     SET included_in_rating = 0
+     WHERE member_id = ? AND included_in_rating = 1`
+  ).run(id);
+}
+
+/**
+ * Add (or re-activate) a rated member from the UI.
+ * Persists in roster extras so sync / deploy keep them.
+ */
+export function addRatedMember(
+  rawName: string,
+  sex?: Sex | null
+): Member {
+  const trimmed = rawName.trim();
+  if (!trimmed) throw new Error("Įveskite vardą ir pavardę");
+  const display = toDisplayName(trimmed);
+  const key = normalizeName(display);
+  if (!key) throw new Error("Neteisingas vardas");
+
+  const db = getDb();
+  const existing = findMemberByName(display);
+  const resolvedSex =
+    sex === "M" || sex === "F"
+      ? sex
+      : existing?.sex ?? inferSexFromName(display);
+
+  let member: Member;
+  if (existing) {
+    db.prepare(
+      `UPDATE members
+       SET display_name = ?, normalized_name = ?, active = 1,
+           sex = COALESCE(?, sex),
+           sex_manual = CASE WHEN ? IS NOT NULL THEN 1 ELSE sex_manual END
+       WHERE id = ?`
+    ).run(
+      display,
+      key,
+      resolvedSex,
+      sex === "M" || sex === "F" ? sex : null,
+      existing.id
+    );
+    member = getMember(existing.id)!;
+  } else {
+    const info = db
+      .prepare(
+        `INSERT INTO members (display_name, normalized_name, sex, sex_manual, active)
+         VALUES (?, ?, ?, ?, 1)`
+      )
+      .run(
+        display,
+        key,
+        resolvedSex,
+        sex === "M" || sex === "F" ? 1 : 0
+      );
+    member = getMember(Number(info.lastInsertRowid))!;
+  }
+
+  const extras = getExtraRosterNames().filter((n) => normalizeName(n) !== key);
+  extras.push(display);
+  setExtraRosterNames(extras);
+
+  const excluded = getExcludedRosterKeys();
+  if (excluded.delete(key)) setExcludedRosterKeys(excluded);
+
+  return member;
 }
 
 export type SyncOfficialRosterResult = {
@@ -216,7 +381,7 @@ export type SyncOfficialRosterResult = {
  * - Drops non-roster athletes from the rating (included_in_rating = 0)
  */
 export function syncOfficialRoster(
-  roster: readonly string[] = OFFICIAL_ROSTER
+  roster: readonly string[] = getEffectiveRoster()
 ): SyncOfficialRosterResult {
   const db = getDb();
   const officialKeys = new Set<string>();

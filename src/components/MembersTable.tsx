@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Member } from "@/lib/db";
 import { sexLabel, sexTitle } from "@/lib/gender";
 
@@ -15,6 +15,15 @@ type Draft = {
   sex: "M" | "F" | "";
 };
 
+type SortKey = "name" | "sex";
+type SortDir = "asc" | "desc";
+
+function sexRank(sex: string | null | undefined): number {
+  if (sex === "M") return 0;
+  if (sex === "F") return 1;
+  return 2;
+}
+
 export function MembersTable({ members }: { members: EditableMember[] }) {
   const router = useRouter();
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -22,6 +31,43 @@ export function MembersTable({ members }: { members: EditableMember[] }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [newName, setNewName] = useState("");
+  const [newSex, setNewSex] = useState<Draft["sex"]>("");
+  const [adding, setAdding] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const sortedMembers = useMemo(() => {
+    const rows = [...members];
+    const dir = sortDir === "asc" ? 1 : -1;
+    rows.sort((a, b) => {
+      if (sortKey === "sex") {
+        const bySex = sexRank(a.sex) - sexRank(b.sex);
+        if (bySex !== 0) return bySex * dir;
+        return (
+          a.display_name.localeCompare(b.display_name, "lt", {
+            sensitivity: "base",
+          }) * dir
+        );
+      }
+      const byName = a.display_name.localeCompare(b.display_name, "lt", {
+        sensitivity: "base",
+      });
+      if (byName !== 0) return byName * dir;
+      return (sexRank(a.sex) - sexRank(b.sex)) * dir;
+    });
+    return rows;
+  }, [members, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir("asc");
+  }
+
 
   function startEdit(m: EditableMember) {
     setEditingId(m.id);
@@ -64,7 +110,7 @@ export function MembersTable({ members }: { members: EditableMember[] }) {
 
   async function removeMember(m: EditableMember) {
     const ok = window.confirm(
-      `Pašalinti „${m.display_name}“ iš aktyvių narių sąrašo?`
+      `Pašalinti „${m.display_name}“ iš reitinguojamų narių?`
     );
     if (!ok) return;
     setBusyId(m.id);
@@ -82,6 +128,32 @@ export function MembersTable({ members }: { members: EditableMember[] }) {
     }
   }
 
+  async function addMember(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setAdding(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: newName.trim(),
+          sex: newSex === "" ? null : newSex,
+        }),
+      });
+      const json = (await res.json()) as { ok: boolean; error?: string };
+      if (!res.ok || !json.ok) throw new Error(json.error ?? "Nepavyko pridėti");
+      setNewName("");
+      setNewSex("");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nepavyko pridėti");
+    } finally {
+      setAdding(false);
+    }
+  }
+
   return (
     <div className="space-y-3">
       {error && (
@@ -89,18 +161,85 @@ export function MembersTable({ members }: { members: EditableMember[] }) {
           {error}
         </div>
       )}
+
+      <form className="card card-pad members-add" onSubmit={addMember}>
+        <div className="members-add-fields">
+          <div>
+            <label className="label" htmlFor="add-member-name">
+              Naujas reitinguojamas narys
+            </label>
+            <input
+              id="add-member-name"
+              className="input"
+              placeholder="Vardas Pavardė"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              disabled={adding || editingId != null}
+              required
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="add-member-sex">
+              Lytis
+            </label>
+            <select
+              id="add-member-sex"
+              className="select"
+              value={newSex}
+              onChange={(e) => setNewSex(e.target.value as Draft["sex"])}
+              disabled={adding || editingId != null}
+            >
+              <option value="">Automatiškai</option>
+              <option value="M">Vyras</option>
+              <option value="F">Moteris</option>
+            </select>
+          </div>
+          <div className="members-add-actions">
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={adding || !newName.trim() || editingId != null}
+            >
+              {adding ? "Pridedama…" : "Pridėti"}
+            </button>
+          </div>
+        </div>
+      </form>
+
       <div className="card table-wrap">
         <table className="ranking ranking-compact">
           <thead>
             <tr>
               <th>#</th>
-              <th>Lytis</th>
-              <th>Vardas</th>
+              <th className={`sortable-th${sortKey === "sex" ? " sorted" : ""}`}>
+                <button
+                  type="button"
+                  className="sort-btn"
+                  onClick={() => toggleSort("sex")}
+                >
+                  <span className="sort-btn-label">Lytis</span>
+                  <span className="sort-indicator" aria-hidden>
+                    {sortKey === "sex" ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
+                  </span>
+                </button>
+              </th>
+              <th className={`sortable-th${sortKey === "name" ? " sorted" : ""}`}>
+                <button
+                  type="button"
+                  className="sort-btn"
+                  onClick={() => toggleSort("name")}
+                >
+                  <span className="sort-btn-label">Vardas</span>
+                  <span className="sort-indicator" aria-hidden>
+                    {sortKey === "name" ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
+                  </span>
+                </button>
+              </th>
               <th>Veiksmai</th>
             </tr>
           </thead>
           <tbody>
-            {members.map((m, i) => {
+            {sortedMembers.map((m, i) => {
               const isEditing = editingId === m.id && draft;
               if (isEditing && draft) {
                 return (

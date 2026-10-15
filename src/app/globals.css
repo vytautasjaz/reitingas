@@ -853,6 +853,25 @@ tr.detail-row td {
   }
 }
 
+.members-add-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(8rem, 10rem) auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.members-add-actions {
+  display: flex;
+  align-items: end;
+  padding-bottom: 0.05rem;
+}
+
+@media (max-width: 640px) {
+  .members-add-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
 .settings-page {
   max-width: 40rem;
 }

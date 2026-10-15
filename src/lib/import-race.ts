@@ -217,23 +217,26 @@ function fillRaceResults(
 
   for (const row of parsed.rows) {
     const club = row.club;
-    if (!clubMentionsTritonas(club)) continue;
+    const sex = normalizeSex(row.sex, row.category, categoryConvention);
+    // Match by Tritonas club OR by official roster name (even under another club).
+    const rosterMember = findActiveRosterMember(row.name);
+    const tritonasClub = clubMentionsTritonas(club);
+
+    if (!tritonasClub && !rosterMember) continue;
     tritonasRows += 1;
 
-    const sex = normalizeSex(row.sex, row.category, categoryConvention);
-    // Rating only for the official roster — never auto-create members from protocols.
-    const rosterMember = findActiveRosterMember(row.name);
     let include = false;
     let memberId: number | null = null;
 
     if (rosterMember) {
+      // On the rated list → points, keep protocol club as written.
       memberId = rosterMember.id;
       if (sex) setMemberSex(rosterMember.id, sex, { overwrite: true });
       include = true;
     } else if (isMixedTritonasClub(club)) {
       skippedMixed.push(`${toDisplayName(row.name)} (${club})`);
     } else if (isPureTritonasClub(club)) {
-      // Tritonas in protocol but not on official roster → keep history, not rating.
+      // Tritonas in protocol but not on official roster → history only, no rating.
       skippedMixed.push(`${toDisplayName(row.name)} (ne sąraše)`);
       const existing = findMemberByName(row.name);
       if (existing) memberId = existing.id;

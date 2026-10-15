@@ -1,9 +1,11 @@
 /**
- * Club matching rules for TRItonas rating inclusion.
+ * Club matching helpers for TRItonas protocol rows.
  *
- * - Pure / containing "tritonas" (any case) qualifies for consideration.
- * - Mixed clubs like "Lietuvos kariuomenė / TRItonas" only count if the athlete
- *   is already on the members list (handled by caller).
+ * Import also matches athletes by official roster name even when the club
+ * field does not mention Tritonas (see import-race fillRaceResults).
+ *
+ * - Pure / containing "tritonas" still pulls the row into history.
+ * - Mixed clubs without a roster match are skipped for rating.
  */
 
 export function clubMentionsTritonas(club: string | null | undefined): boolean {

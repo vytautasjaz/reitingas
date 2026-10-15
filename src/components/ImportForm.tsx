@@ -245,7 +245,7 @@ export function ImportForm({ distances }: { distances: DistanceSetting[] }) {
                 Importas sėkmingas
               </p>
               <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--muted)" }}>
-                Protokolo eilučių: {result.totalRows} · TRItonas paminėjimų:{" "}
+                Protokolo eilučių: {result.totalRows} · Rasta (klubas / nariai):{" "}
                 {result.tritonasRows} · Įtraukta į reitingą: {result.included}
                 {result.raceIds ? ` · Distancijos: ${result.raceIds.length}` : ""}
               </p>

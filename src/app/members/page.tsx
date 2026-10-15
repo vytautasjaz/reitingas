@@ -42,9 +42,9 @@ export default function MembersPage() {
         <div>
           <h1>Reitinguojami nariai</h1>
           <p>
-            Oficialus klubo sąrašas — tik šie sportininkai patenka į reitingą.
-            Protokoluose kiti Tritono vardai gali likti istorijai, bet be taškų.
-            Sezono pabaigoje ankstesnių metų įskaitą išsaugo sezonų perjungiklis.
+            Tik šie sportininkai patenka į reitingą. Galite pridėti naują narį
+            žemiau — jis išliks ir po sinchronizavimo. Protokoluose kiti Tritono
+            vardai gali likti istorijai, bet be taškų.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
