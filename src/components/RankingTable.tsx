@@ -131,7 +131,7 @@ export function RankingTable({
   races?: Race[];
   events: RaceEvent[];
 }) {
-  const [showRaces, setShowRaces] = useState(false);
+  const [showRaces, setShowRaces] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("place");
@@ -140,7 +140,9 @@ export function RankingTable({
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw === "1") setShowRaces(true);
+      // Default: expanded. Only collapse when user previously chose so.
+      if (raw === "0") setShowRaces(false);
+      else setShowRaces(true);
     } catch {
       /* ignore */
     }

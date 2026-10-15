@@ -329,37 +329,29 @@ export function RaceParticipantsPanel({
                             </label>
                           </div>
                         </div>
-                        <div
-                          style={{
-                            marginTop: "0.65rem",
-                            display: "flex",
-                            gap: "0.85rem",
-                            alignItems: "center",
-                            flexWrap: "wrap",
-                          }}
-                        >
+                        <div className="edit-participant-actions">
                           <button
                             type="button"
-                            className="link-action"
+                            className="btn btn-primary text-sm"
                             disabled={saving}
                             onClick={() => saveEdit(r.id)}
                           >
-                            {saving ? "Saugoma…" : "išsaugoti"}
+                            {saving ? "Saugoma…" : "Išsaugoti"}
                           </button>
                           <button
                             type="button"
-                            className="link-muted"
+                            className="btn btn-ghost text-sm"
                             disabled={saving}
                             onClick={cancelEdit}
                           >
-                            atšaukti
+                            Atšaukti
                           </button>
                           {editErr && (
                             <span style={{ color: "var(--danger)", fontSize: "0.85rem" }}>
                               {editErr}
                             </span>
                           )}
-                          <span style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
+                          <span className="edit-participant-hint">
                             Tušti taškai + laikas → perskaičiuojama automatiškai
                           </span>
                         </div>

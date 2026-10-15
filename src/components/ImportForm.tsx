@@ -187,6 +187,26 @@ export function ImportForm() {
                 </button>
               </div>
             ))}
+            <button
+              type="button"
+              className="leg-row-add"
+              onClick={() => setLegs((prev) => [...prev, newLeg()])}
+            >
+              <div className="leg-index">+</div>
+              <div className="leg-row-add-fields">
+                <div>
+                  <label className="label">Distancija</label>
+                  <select className="select" tabIndex={-1} aria-hidden disabled>
+                    <option>Olimpinė / OD — 1000</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <label className="label">Rezultatų failas</label>
+                  <input className="input" disabled tabIndex={-1} aria-hidden />
+                </div>
+              </div>
+              <span className="leg-row-add-label">Pridėti papildomą protokolą</span>
+            </button>
           </div>
         </div>
 
@@ -201,13 +221,6 @@ export function ImportForm() {
         >
           <button type="submit" className="btn btn-primary" disabled={pending}>
             {pending ? "Importuojama…" : "Įkelti varžybas"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost text-sm"
-            onClick={() => setLegs((prev) => [...prev, newLeg()])}
-          >
-            + Pridėti papildomą protokolą
           </button>
         </div>
       </form>

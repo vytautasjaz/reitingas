@@ -795,7 +795,7 @@ tr.detail-row td {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  max-width: 28rem;
+  max-width: 40rem;
 }
 
 .races-add-choose-head {
@@ -815,7 +815,8 @@ tr.detail-row td {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  max-width: 36rem;
+  width: 100%;
+  max-width: none;
 }
 
 .races-entry-active-bar {
@@ -928,6 +929,57 @@ tr.detail-row td {
   border-radius: var(--radius);
   background: #fafaf8;
   text-align: left;
+}
+
+.leg-row-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px dashed #cfcfc8;
+  border-radius: var(--radius);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--muted);
+  font: inherit;
+}
+
+.leg-row-add:hover {
+  border-color: #b5b5ae;
+  background: #f7f7f4;
+  color: var(--text);
+}
+
+.leg-row-add .leg-index {
+  background: transparent;
+  border: 1px dashed #cfcfc8;
+  color: var(--muted);
+}
+
+.leg-row-add-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  flex: 1;
+  min-width: 0;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.leg-row-add-fields .input,
+.leg-row-add-fields .select {
+  background: #fafaf8;
+}
+
+.leg-row-add-label {
+  align-self: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-left: auto;
+  padding-bottom: 0.15rem;
 }
 
 .leg-index {
@@ -1836,8 +1888,28 @@ table.ranking td.accent-cell {
   text-align: left;
 }
 
+.edit-participant-actions {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.edit-participant-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+
 tr.row-editing {
   background: #f3f5f0 !important;
+}
+
+tr.row-editing > td {
+  border-left: 2px solid var(--accent);
 }
 
 .sex-edit-group {
