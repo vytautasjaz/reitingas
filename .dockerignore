@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+data/*.db
+data/*.db-*
+.env
+.env.*
+*.md
+.DS_Store
+_write_test
+agent-transcripts

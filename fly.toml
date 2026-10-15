@@ -1,0 +1,30 @@
+# fly.toml app configuration file generated for reitingas
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+
+app = 'reitingas'
+primary_region = 'ams'
+
+[build]
+
+[env]
+  DATA_DIR = '/data'
+  NODE_ENV = 'production'
+  PORT = '3000'
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[mounts]
+  source = 'reitingas_data'
+  destination = '/data'
