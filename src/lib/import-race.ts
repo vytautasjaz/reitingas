@@ -1,7 +1,11 @@
 import { getDb, DistanceType, Race, RaceMeet } from "./db";
 import { clubMentionsTritonas, isMixedTritonasClub, isPureTritonasClub } from "./club";
 import { detectCategoryConvention, normalizeSex } from "./gender";
-import { ensureMember, findMemberByName, setMemberSex } from "./members";
+import {
+  findActiveRosterMember,
+  findMemberByName,
+  setMemberSex,
+} from "./members";
 import { parseResultsFileBuffer, ParsedResultRow } from "./parse-results";
 import { computeFieldSizes, computePlaceBySexMap } from "./place-by-sex";
 import { formatSeconds } from "./scoring";
@@ -217,25 +221,22 @@ function fillRaceResults(
     tritonasRows += 1;
 
     const sex = normalizeSex(row.sex, row.category, categoryConvention);
-    const existing = findMemberByName(row.name);
+    // Rating only for the official roster — never auto-create members from protocols.
+    const rosterMember = findActiveRosterMember(row.name);
     let include = false;
     let memberId: number | null = null;
 
-    if (isPureTritonasClub(club)) {
-      const before = existing;
-      const member = ensureMember(row.name, sex);
-      memberId = member.id;
-      if (sex) setMemberSex(member.id, sex, { overwrite: true });
+    if (rosterMember) {
+      memberId = rosterMember.id;
+      if (sex) setMemberSex(rosterMember.id, sex, { overwrite: true });
       include = true;
-      if (!before) newMembers.push(member.display_name);
     } else if (isMixedTritonasClub(club)) {
-      if (existing) {
-        memberId = existing.id;
-        if (sex) setMemberSex(existing.id, sex, { overwrite: true });
-        include = true;
-      } else {
-        skippedMixed.push(`${toDisplayName(row.name)} (${club})`);
-      }
+      skippedMixed.push(`${toDisplayName(row.name)} (${club})`);
+    } else if (isPureTritonasClub(club)) {
+      // Tritonas in protocol but not on official roster → keep history, not rating.
+      skippedMixed.push(`${toDisplayName(row.name)} (ne sąraše)`);
+      const existing = findMemberByName(row.name);
+      if (existing) memberId = existing.id;
     }
 
     const secs = athleteSeconds(row);

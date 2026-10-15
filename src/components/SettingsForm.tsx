@@ -156,18 +156,18 @@ export function SettingsForm({
 
   return (
     <div className="settings-panel">
-      <section className="settings-block settings-block-rules">
-        <h2 className="settings-block-title">Reitingas</h2>
-        <div className="settings-params">
-          <label className="settings-field">
-            <span className="settings-field-text">
-              <span className="settings-field-title">
-                Kiek geriausių etapų įskaitoma
-              </span>
-              <span className="settings-field-desc">Top N į bendrą sumą</span>
-            </span>
+      <section className="card settings-card">
+        <div className="settings-card-head">
+          <h2>Reitingas</h2>
+          <p>Kaip skaičiuojama sezono suma ir taškai.</p>
+        </div>
+
+        <div className="settings-rules-grid">
+          <label className="settings-rule">
+            <span className="settings-rule-label">Geriausi etapai</span>
+            <span className="settings-rule-hint">Top N į bendrą sumą</span>
             <input
-              className="settings-input settings-num"
+              className="input settings-rule-input font-mono"
               type="number"
               min={1}
               max={20}
@@ -180,15 +180,12 @@ export function SettingsForm({
               }
             />
           </label>
-          <label className="settings-field">
-            <span className="settings-field-text">
-              <span className="settings-field-title">
-                Kiek užsienio startų galima įskaityti
-              </span>
-              <span className="settings-field-desc">iš Top N</span>
-            </span>
+
+          <label className="settings-rule">
+            <span className="settings-rule-label">Užsienio limitas</span>
+            <span className="settings-rule-hint">kiek iš Top N</span>
             <input
-              className="settings-input settings-num"
+              className="input settings-rule-input font-mono"
               type="number"
               min={0}
               max={10}
@@ -201,15 +198,12 @@ export function SettingsForm({
               }
             />
           </label>
-          <label className="settings-field">
-            <span className="settings-field-text">
-              <span className="settings-field-title">
-                Užsienio starto taškų priedas
-              </span>
-              <span className="settings-field-desc">%, pvz. 10 = +10 %</span>
-            </span>
+
+          <label className="settings-rule">
+            <span className="settings-rule-label">Užsienio priedas</span>
+            <span className="settings-rule-hint">procentais, pvz. 10</span>
             <input
-              className="settings-input settings-num"
+              className="input settings-rule-input font-mono"
               type="number"
               min={0}
               max={100}
@@ -222,13 +216,12 @@ export function SettingsForm({
               }
             />
           </label>
-          <label className="settings-field">
-            <span className="settings-field-text">
-              <span className="settings-field-title">Formulės eksponentė</span>
-              <span className="settings-field-desc">1 = lyderis / dalyvis</span>
-            </span>
+
+          <label className="settings-rule">
+            <span className="settings-rule-label">Eksponentė</span>
+            <span className="settings-rule-hint">1 = lyderis / dalyvis</span>
             <input
-              className="settings-input settings-num"
+              className="input settings-rule-input font-mono"
               type="number"
               min={0.1}
               max={5}
@@ -243,14 +236,19 @@ export function SettingsForm({
             />
           </label>
         </div>
-        <p className="settings-formula font-mono" title={formula}>
+
+        <div className="settings-formula font-mono" title={formula}>
           {previewFormula}
-        </p>
+        </div>
       </section>
 
-      <section className="settings-block settings-block-distances">
-        <h2 className="settings-block-title">Distancijos</h2>
-        <table className="settings-dist-table">
+      <section className="card table-wrap settings-card">
+        <div className="settings-card-head settings-card-head-pad">
+          <h2>Distancijos</h2>
+          <p>Bazė naudojama taškų formulei. Galite pridėti savo tipus.</p>
+        </div>
+
+        <table className="ranking settings-dist-table">
           <thead>
             <tr>
               <th>Pavadinimas</th>
@@ -264,7 +262,7 @@ export function SettingsForm({
               <tr key={d.id}>
                 <td>
                   <input
-                    className="settings-input"
+                    className="input settings-cell-input"
                     value={d.label}
                     onChange={(e) =>
                       updateDistance(d.id, { label: e.target.value })
@@ -274,7 +272,7 @@ export function SettingsForm({
                 </td>
                 <td>
                   <input
-                    className="settings-input settings-input-center"
+                    className="input settings-cell-input settings-cell-center font-mono"
                     value={d.shortLabel}
                     onChange={(e) =>
                       updateDistance(d.id, { shortLabel: e.target.value })
@@ -284,7 +282,7 @@ export function SettingsForm({
                 </td>
                 <td>
                   <input
-                    className="settings-input settings-input-center font-mono"
+                    className="input settings-cell-input settings-cell-center font-mono"
                     type="number"
                     min={1}
                     value={d.basePoints}
@@ -300,15 +298,14 @@ export function SettingsForm({
                   {!d.builtin ? (
                     <button
                       type="button"
-                      className="settings-icon-btn"
+                      className="btn btn-ghost text-sm"
                       disabled={pending}
                       onClick={() => removeDistance(d.id)}
-                      title="Ištrinti"
                     >
-                      ×
+                      Ištrinti
                     </button>
                   ) : (
-                    <span className="settings-cell-spacer" />
+                    <span className="muted text-sm">įmont.</span>
                   )}
                 </td>
               </tr>
@@ -316,7 +313,7 @@ export function SettingsForm({
             <tr className="settings-add-row">
               <td>
                 <input
-                  className="settings-input"
+                  className="input settings-cell-input"
                   placeholder="Akvatlonas…"
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
@@ -324,7 +321,7 @@ export function SettingsForm({
               </td>
               <td>
                 <input
-                  className="settings-input settings-input-center"
+                  className="input settings-cell-input settings-cell-center font-mono"
                   placeholder="AQ"
                   value={newShort}
                   onChange={(e) => setNewShort(e.target.value)}
@@ -332,7 +329,7 @@ export function SettingsForm({
               </td>
               <td>
                 <input
-                  className="settings-input settings-input-center font-mono"
+                  className="input settings-cell-input settings-cell-center font-mono"
                   type="number"
                   min={1}
                   value={newBase}
@@ -342,12 +339,11 @@ export function SettingsForm({
               <td className="settings-cell-act">
                 <button
                   type="button"
-                  className="settings-icon-btn settings-icon-btn-add"
+                  className="btn btn-ghost text-sm"
                   disabled={pending || !newLabel.trim()}
                   onClick={addDistance}
-                  title="Pridėti"
                 >
-                  +
+                  Pridėti
                 </button>
               </td>
             </tr>

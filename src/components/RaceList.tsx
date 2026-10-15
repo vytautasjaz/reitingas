@@ -62,7 +62,8 @@ export function RaceList({ meets }: { meets: MeetWithRaces[] }) {
             <tr>
               <th>Data</th>
               <th>Varžybos</th>
-              <th>Tipas</th>
+              <th>Startas</th>
+              <th>Nariai</th>
               <th>Distancijos</th>
               <th>Veiksmai</th>
             </tr>
@@ -82,12 +83,18 @@ export function RaceList({ meets }: { meets: MeetWithRaces[] }) {
                 </td>
                 <td>
                   {meet.foreign_start ? (
-                    <span className="foreign-tag" title="Užsienio startas">
+                    <span className="foreign-tag" title="Į geriausių trijų sumą gali įeiti tik vienas">
                       Užsienio
                     </span>
                   ) : (
-                    <span className="muted text-sm">—</span>
+                    <span className="muted text-sm">Lietuva</span>
                   )}
+                </td>
+                <td
+                  className="font-mono text-sm"
+                  title="Skirtingų klubo narių skaičius"
+                >
+                  {meet.member_count}
                 </td>
                 <td>
                   <div className="row-actions">

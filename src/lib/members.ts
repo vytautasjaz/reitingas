@@ -1,6 +1,10 @@
 import fs from "fs";
 import path from "path";
 import * as XLSX from "xlsx";
+import {
+  OFFICIAL_ROSTER,
+  ROSTER_ALIASES,
+} from "@/data/official-roster";
 import { getDb, Member } from "./db";
 import { inferSexFromName, Sex } from "./gender";
 import { normalizeName, toDisplayName } from "./names";
@@ -11,6 +15,26 @@ export function findMemberByName(rawName: string): Member | undefined {
   return db
     .prepare("SELECT * FROM members WHERE normalized_name = ?")
     .get(key) as Member | undefined;
+}
+
+/**
+ * Resolve a protocol / typed name to an active official-roster member.
+ * Does not create members. Alias spellings are remapped first.
+ */
+export function findActiveRosterMember(
+  rawName: string
+): Member | undefined {
+  const key = normalizeName(rawName);
+  if (!key) return undefined;
+
+  const aliasOfficial = ROSTER_ALIASES[key];
+  const lookupName = aliasOfficial ?? rawName;
+  const member =
+    findMemberByName(lookupName) ??
+    (aliasOfficial ? undefined : findMemberByName(rawName));
+
+  if (!member || !member.active) return undefined;
+  return member;
 }
 
 export function getMember(id: number): Member | undefined {
@@ -135,6 +159,144 @@ export function deactivateMember(id: number): void {
   const existing = getMember(id);
   if (!existing) throw new Error("Narys nerastas");
   db.prepare("UPDATE members SET active = 0 WHERE id = ?").run(id);
+}
+
+export type SyncOfficialRosterResult = {
+  ensured: number;
+  inserted: number;
+  reactivated: number;
+  deactivated: number;
+  remappedResults: number;
+  excludedFromRating: number;
+  names: string[];
+};
+
+/**
+ * Make the members table match the official TRItonas roster.
+ * - Ensures every official name exists and is active
+ * - Deactivates anyone not on the roster (keeps rows + race history)
+ * - Remaps alias results onto the official member
+ * - Drops non-roster athletes from the rating (included_in_rating = 0)
+ */
+export function syncOfficialRoster(
+  roster: readonly string[] = OFFICIAL_ROSTER
+): SyncOfficialRosterResult {
+  const db = getDb();
+  const officialKeys = new Set<string>();
+  const names: string[] = [];
+  let inserted = 0;
+  let reactivated = 0;
+  let ensured = 0;
+  let remappedResults = 0;
+
+  const insert = db.prepare(
+    `INSERT INTO members (display_name, normalized_name, sex, sex_manual, active)
+     VALUES (?, ?, ?, 0, 1)`
+  );
+  const activate = db.prepare(
+    `UPDATE members
+     SET display_name = ?, normalized_name = ?, active = 1
+     WHERE id = ?`
+  );
+  const findByNorm = db.prepare(
+    "SELECT * FROM members WHERE normalized_name = ? LIMIT 1"
+  );
+
+  const tx = db.transaction(() => {
+    for (const raw of roster) {
+      const display = toDisplayName(raw.trim());
+      const key = normalizeName(display);
+      if (!key) continue;
+      officialKeys.add(key);
+      names.push(display);
+
+      let row = findByNorm.get(key) as Member | undefined;
+      if (!row) {
+        // Alias: e.g. Valdemaras → Valdemar
+        for (const [aliasKey, officialName] of Object.entries(ROSTER_ALIASES)) {
+          if (normalizeName(officialName) !== key) continue;
+          const aliased = findByNorm.get(aliasKey) as Member | undefined;
+          if (aliased) {
+            row = aliased;
+            break;
+          }
+        }
+      }
+
+      const sex = row?.sex ?? inferSexFromName(display);
+      if (!row) {
+        insert.run(display, key, sex);
+        inserted += 1;
+      } else {
+        const wasActive = !!row.active;
+        activate.run(display, key, row.id);
+        if (!wasActive) reactivated += 1;
+      }
+      ensured += 1;
+    }
+
+    // Remap alias result rows onto the official member id.
+    for (const [aliasKey, officialName] of Object.entries(ROSTER_ALIASES)) {
+      const official = findByNorm.get(normalizeName(officialName)) as
+        | Member
+        | undefined;
+      const alias = findByNorm.get(aliasKey) as Member | undefined;
+      if (!official || !alias || official.id === alias.id) continue;
+
+      const info = db
+        .prepare(
+          `UPDATE race_results
+           SET member_id = ?, raw_name = ?
+           WHERE member_id = ?`
+        )
+        .run(official.id, official.display_name, alias.id);
+      remappedResults += Number(info.changes ?? 0);
+    }
+
+    const all = db
+      .prepare("SELECT id, normalized_name, active FROM members")
+      .all() as Array<{ id: number; normalized_name: string; active: number }>;
+
+    let deactivated = 0;
+    const deactivate = db.prepare(
+      "UPDATE members SET active = 0 WHERE id = ? AND active = 1"
+    );
+    for (const m of all) {
+      if (officialKeys.has(m.normalized_name)) continue;
+      // Also keep alias rows inactive (already remapped)
+      const info = deactivate.run(m.id);
+      deactivated += Number(info.changes ?? 0);
+    }
+
+    // Non-roster (inactive) athletes stay in protocols but leave the rating.
+    const exclude = db
+      .prepare(
+        `UPDATE race_results
+         SET included_in_rating = 0
+         WHERE member_id IS NOT NULL
+           AND member_id IN (SELECT id FROM members WHERE active = 0)
+           AND included_in_rating = 1`
+      )
+      .run();
+
+    return {
+      deactivated,
+      excludedFromRating: Number(exclude.changes ?? 0),
+    };
+  });
+
+  const { deactivated, excludedFromRating } = tx();
+  backfillMemberSexFromNames();
+
+  return {
+    ensured,
+    inserted,
+    reactivated,
+    deactivated,
+    remappedResults,
+    excludedFromRating,
+    names,
+  };
 }
 
 /** Fill missing member.sex from Lithuanian surname heuristics. */

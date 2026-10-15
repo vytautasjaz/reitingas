@@ -3,13 +3,26 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { formatSeconds } from "@/lib/time-format";
 
 type MeetPayload = {
   id: number;
   name: string;
   meet_date: string;
   foreign_start: boolean;
-  races: Array<{ id: number; name: string; distance_type: string }>;
+  races: Array<{
+    id: number;
+    name: string;
+    distance_type: string;
+    leader_time_seconds: number | null;
+  }>;
+};
+
+type RaceEditRow = {
+  id: number;
+  name: string;
+  distance_type: string;
+  leaderTime: string;
 };
 
 export default function MeetEditPage() {
@@ -20,7 +33,7 @@ export default function MeetEditPage() {
   const [name, setName] = useState("");
   const [meetDate, setMeetDate] = useState("");
   const [foreignStart, setForeignStart] = useState(false);
-  const [races, setRaces] = useState<MeetPayload["races"]>([]);
+  const [races, setRaces] = useState<RaceEditRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +56,17 @@ export default function MeetEditPage() {
         setName(json.meet.name);
         setMeetDate(json.meet.meet_date);
         setForeignStart(!!json.meet.foreign_start);
-        setRaces(json.meet.races);
+        setRaces(
+          json.meet.races.map((r) => ({
+            id: r.id,
+            name: r.name,
+            distance_type: r.distance_type,
+            leaderTime:
+              r.leader_time_seconds != null
+                ? formatSeconds(r.leader_time_seconds)
+                : "",
+          }))
+        );
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Klaida");
@@ -66,11 +89,19 @@ export default function MeetEditPage() {
       const res = await fetch(`/api/meets/${meetId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, meetDate, foreignStart }),
+        body: JSON.stringify({
+          name,
+          meetDate,
+          foreignStart,
+          raceLeaders: races.map((r) => ({
+            raceId: r.id,
+            leaderTime: r.leaderTime.trim() || null,
+          })),
+        }),
       });
       const json = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !json.ok) throw new Error(json.error ?? "Nepavyko");
-      setMsg("Išsaugota");
+      setMsg("Išsaugota. Taškai perskaičiuoti pagal nugalėtojo laiką.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Nepavyko išsaugoti");
@@ -94,7 +125,10 @@ export default function MeetEditPage() {
             ← Atgal
           </Link>
           <h1 style={{ marginTop: "0.5rem" }}>Redaguoti varžybas</h1>
-          <p>Pavadinimas ir data. Distancijų protokolus redaguokite atskirai.</p>
+          <p>
+            Pavadinimas, data ir nugalėtojo laikas pagal distanciją. Dalyvius
+            redaguokite atskirai.
+          </p>
         </div>
       </div>
 
@@ -149,11 +183,64 @@ export default function MeetEditPage() {
             </span>
           </label>
         </div>
-        <div style={{ gridColumn: "1 / -1", display: "flex", gap: "0.75rem", alignItems: "center" }}>
+
+        {races.length > 0 && (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <h3
+              style={{
+                margin: "0 0 0.75rem",
+                fontSize: "1.05rem",
+                fontWeight: 800,
+              }}
+            >
+              Nugalėtojo laikas
+            </h3>
+            <div
+              style={{
+                display: "grid",
+                gap: "0.75rem",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              }}
+            >
+              {races.map((r, idx) => (
+                <div key={r.id}>
+                  <label className="label" htmlFor={`leader-${r.id}`}>
+                    {r.distance_type}
+                  </label>
+                  <input
+                    id={`leader-${r.id}`}
+                    className="input font-mono"
+                    placeholder="pvz. 1:58:12.4"
+                    value={r.leaderTime}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setRaces((prev) =>
+                        prev.map((row, i) =>
+                          i === idx ? { ...row, leaderTime: value } : row
+                        )
+                      );
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div
+          style={{
+            gridColumn: "1 / -1",
+            display: "flex",
+            gap: "0.75rem",
+            alignItems: "center",
+          }}
+        >
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? "Saugoma…" : "Išsaugoti"}
           </button>
-          {msg && <span style={{ color: "var(--good)", fontWeight: 600 }}>{msg}</span>}
+          {msg && (
+            <span style={{ color: "var(--good)", fontWeight: 600 }}>{msg}</span>
+          )}
           {error && <span style={{ color: "var(--danger)" }}>{error}</span>}
         </div>
       </form>
@@ -169,6 +256,7 @@ export default function MeetEditPage() {
             <tr>
               <th>Pavadinimas</th>
               <th>Tipas</th>
+              <th>Nugalėtojas</th>
               <th>Veiksmai</th>
             </tr>
           </thead>
@@ -177,8 +265,12 @@ export default function MeetEditPage() {
               <tr key={r.id}>
                 <td style={{ fontWeight: 600 }}>{r.name}</td>
                 <td>{r.distance_type}</td>
+                <td className="font-mono">{r.leaderTime || "—"}</td>
                 <td>
-                  <Link href={`/races/${r.id}/edit`} className="btn btn-ghost text-sm">
+                  <Link
+                    href={`/races/${r.id}/edit`}
+                    className="btn btn-ghost text-sm"
+                  >
                     Redaguoti dalyvius / taškus
                   </Link>
                 </td>

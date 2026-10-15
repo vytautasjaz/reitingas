@@ -298,6 +298,10 @@ export function recalculateAllPoints(settings?: AppSettings): RecalculateResult 
       }
 
       const leader = race.leader_time_seconds;
+      // Missing leader must not wipe points — leave results unchanged.
+      if (leader == null || leader <= 0) {
+        continue;
+      }
       const foreignBonus = race.foreign_start ? s.foreignBonusPercent : 0;
       const rows = resultsStmt.all(race.id) as Array<{
         id: number;
@@ -314,7 +318,7 @@ export function recalculateAllPoints(settings?: AppSettings): RecalculateResult 
           continue;
         }
         const secs = row.time_seconds ?? row.gun_time_seconds;
-        if (secs == null || leader == null || leader <= 0) {
+        if (secs == null) {
           updateResult.run(row.finish_status === "dnf" ? 0 : null, row.id);
           resultsUpdated += 1;
           continue;

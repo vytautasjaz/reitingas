@@ -256,7 +256,8 @@ export function ImportForm({ distances }: { distances: DistanceSetting[] }) {
               )}
               {result.skippedMixed && result.skippedMixed.length > 0 && (
                 <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--warn)" }}>
-                  Praleisti mišrūs (ne nariai): {result.skippedMixed.join("; ")}
+                  Neįtraukti į reitingą (ne oficialiame sąraše):{" "}
+                  {result.skippedMixed.join("; ")}
                 </p>
               )}
               {result.meetId != null && (

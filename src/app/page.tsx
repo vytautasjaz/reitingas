@@ -37,7 +37,7 @@ export default async function HomePage() {
 
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-label">Nariai</div>
+          <div className="stat-label">Reitinguojami nariai</div>
           <div className="stat-value">{members.length}</div>
         </div>
         <div className="stat-card">

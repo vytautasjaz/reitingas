@@ -54,15 +54,14 @@ export async function PATCH(
       );
     }
 
-    let leaderTimeSeconds: number | null | undefined = undefined;
+    let leaderTimeSeconds: number | undefined = undefined;
     if (body.leaderTime !== undefined) {
-      if (body.leaderTime == null || body.leaderTime.trim() === "") {
-        leaderTimeSeconds = null;
-      } else {
+      // Empty keeps existing leader — clearing nulls out scoring.
+      if (body.leaderTime != null && body.leaderTime.trim() !== "") {
         const parsed = parseTimeToSeconds(body.leaderTime);
-        if (parsed == null) {
+        if (parsed == null || parsed <= 0) {
           return NextResponse.json(
-            { ok: false, error: "Neteisingas lyderio laikas" },
+            { ok: false, error: "Neteisingas nugalėtojo laikas" },
             { status: 400 }
           );
         }

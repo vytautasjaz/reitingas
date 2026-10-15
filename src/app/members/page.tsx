@@ -4,19 +4,20 @@ import {
   backfillMemberSexFromNames,
   listMembers,
   repairMemberSexes,
-  seedMembersFromWorkbook,
+  syncOfficialRoster,
 } from "@/lib/members";
 import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
-async function seedAction() {
+async function syncRosterAction() {
   "use server";
   getDb();
-  seedMembersFromWorkbook();
-  backfillMemberSexFromNames();
+  syncOfficialRoster();
   revalidatePath("/");
   revalidatePath("/members");
+  revalidatePath("/standings");
+  revalidatePath("/races");
 }
 
 async function repairSexAction() {
@@ -39,21 +40,22 @@ export default function MembersPage() {
     <div>
       <div className="page-header">
         <div>
-          <h1>Nariai</h1>
+          <h1>Reitinguojami nariai</h1>
           <p>
-            Redaguokite vardą ir lytį. Rankiniu būdu pataisyta lytis nebus
-            perrašyta iš naujų protokolų. V / M — greitas lyties perjungimas.
+            Oficialus klubo sąrašas — tik šie sportininkai patenka į reitingą.
+            Protokoluose kiti Tritono vardai gali likti istorijai, bet be taškų.
+            Sezono pabaigoje ankstesnių metų įskaitą išsaugo sezonų perjungiklis.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
           <form action={repairSexAction}>
-            <button type="submit" className="btn btn-primary">
+            <button type="submit" className="btn btn-ghost">
               Sutvarkyti lytis
             </button>
           </form>
-          <form action={seedAction}>
-            <button type="submit" className="btn btn-ghost">
-              Seed iš Sample Excel
+          <form action={syncRosterAction}>
+            <button type="submit" className="btn btn-primary">
+              Sinchronizuoti sąrašą
             </button>
           </form>
         </div>
@@ -61,7 +63,7 @@ export default function MembersPage() {
 
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-label">Iš viso</div>
+          <div className="stat-label">Sąraše</div>
           <div className="stat-value">{members.length}</div>
         </div>
         <div className="stat-card">

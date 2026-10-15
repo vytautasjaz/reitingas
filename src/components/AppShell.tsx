@@ -39,7 +39,7 @@ const links = [
   },
   {
     href: "/members",
-    label: "Nariai",
+    label: "Reitinguojami nariai",
     icon: (
       <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="9" cy="8" r="3" />

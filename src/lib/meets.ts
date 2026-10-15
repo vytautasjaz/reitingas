@@ -1,5 +1,5 @@
 import { getDb, DistanceType, Race, RaceMeet } from "./db";
-import { ensureMember } from "./members";
+import { findActiveRosterMember, getMember } from "./members";
 import {
   classifyFinishStatus,
   parseTimeToSeconds,
@@ -10,7 +10,11 @@ import {
   scoreAthlete,
 } from "./settings";
 
-export type MeetWithRaces = RaceMeet & { races: Race[] };
+export type MeetWithRaces = RaceMeet & {
+  races: Race[];
+  /** Distinct club members (linked member_id) across all legs. */
+  member_count: number;
+};
 
 export type ManualParticipantInput = {
   memberId?: number | null;
@@ -98,11 +102,28 @@ export function getMeetRaces(meetId: number): Race[] {
     .all(meetId) as Race[];
 }
 
+/** Distinct club members who appear in any race of the meet. */
+export function getMeetMemberCount(meetId: number): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(DISTINCT rr.member_id) AS n
+       FROM race_results rr
+       JOIN races r ON r.id = rr.race_id
+       JOIN members m ON m.id = rr.member_id
+       WHERE r.meet_id = ?
+         AND m.active = 1
+         AND rr.included_in_rating = 1`
+    )
+    .get(meetId) as { n: number };
+  return row?.n ?? 0;
+}
+
 export function listMeetsWithRaces(year?: number): MeetWithRaces[] {
   const meets = listMeets(year);
   return meets.map((m) => ({
     ...m,
     races: getMeetRaces(m.id),
+    member_count: getMeetMemberCount(m.id),
   }));
 }
 
@@ -215,16 +236,19 @@ export function createManualMeet(
 
         let member;
         if (p.memberId != null) {
-          member = db
-            .prepare("SELECT * FROM members WHERE id = ?")
-            .get(p.memberId) as { id: number; display_name: string; sex: string | null } | undefined;
-          if (!member) {
+          member = getMember(p.memberId);
+          if (!member || !member.active) {
             throw new Error(
-              `Distancija ${legIndex + 1}, dalyvis ${pIndex + 1}: narys nerastas`
+              `Distancija ${legIndex + 1}, dalyvis ${pIndex + 1}: narys ne oficialiame sąraše`
             );
           }
         } else if (p.name?.trim()) {
-          member = ensureMember(p.name.trim());
+          member = findActiveRosterMember(p.name.trim());
+          if (!member) {
+            throw new Error(
+              `Distancija ${legIndex + 1}, dalyvis ${pIndex + 1}: „${p.name.trim()}“ ne oficialiame narių sąraše`
+            );
+          }
         } else {
           throw new Error(
             `Distancija ${legIndex + 1}, dalyvis ${pIndex + 1}: pasirinkite narį arba įveskite vardą`

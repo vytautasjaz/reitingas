@@ -6,6 +6,7 @@ import { formatDateLt } from "@/lib/dates";
 import { listMembers } from "@/lib/members";
 import { getMeet, getMeetRaces } from "@/lib/meets";
 import { getRaceResults } from "@/lib/ranking";
+import { formatSeconds } from "@/lib/time-format";
 import { DeleteMeetButton } from "./DeleteMeetButton";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +74,9 @@ export default async function MeetDetailPage({
               </h2>
               <p style={{ margin: "0.25rem 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>
                 {DISTANCE_LABEL[race.distance_type] ?? race.distance_type}
+                {race.leader_time_seconds != null
+                  ? ` · nugalėtojas ${formatSeconds(race.leader_time_seconds)}`
+                  : " · nugalėtojo laikas —"}
                 {race.source_filename ? ` · ${race.source_filename}` : ""}
                 {" · "}
                 reitinge {included}/{results.length}

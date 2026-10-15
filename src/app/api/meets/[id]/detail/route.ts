@@ -28,6 +28,8 @@ export async function GET(
           id: r.id,
           name: r.name,
           distance_type: r.distance_type,
+          leader_time_seconds: r.leader_time_seconds,
+          base_points: r.base_points,
         })),
       },
     });

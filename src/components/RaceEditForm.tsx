@@ -214,11 +214,11 @@ export function RaceEditForm({
 
         <div>
           <label className="label" htmlFor="edit-leader">
-            Lyderio laikas (protokolo)
+            Nugalėtojo laikas
           </label>
           <input
             id="edit-leader"
-            className="input"
+            className="input font-mono"
             placeholder="pvz. 1:58:12.4"
             value={leaderTime}
             onChange={(e) => setLeaderTime(e.target.value)}

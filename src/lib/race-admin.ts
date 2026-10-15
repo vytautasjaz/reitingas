@@ -5,7 +5,7 @@ import {
   RaceResult,
   Member,
 } from "./db";
-import { ensureMember } from "./members";
+import { findActiveRosterMember, getMember } from "./members";
 import {
   classifyFinishStatus,
   parseTimeToSeconds,
@@ -170,10 +170,16 @@ export function updateRace(raceId: number, input: UpdateRaceInput): Race {
 
   const base = basePointsForDistanceId(input.distanceType);
   const distanceChanged = existing.distance_type !== input.distanceType;
+  // null/empty leader input keeps the existing protocol winner time —
+  // clearing it wipes scoring on the next global recalc.
   const leader =
-    input.leaderTimeSeconds !== undefined
+    input.leaderTimeSeconds != null && input.leaderTimeSeconds > 0
       ? input.leaderTimeSeconds
       : existing.leader_time_seconds;
+  const leaderChanged =
+    input.leaderTimeSeconds != null &&
+    input.leaderTimeSeconds > 0 &&
+    input.leaderTimeSeconds !== existing.leader_time_seconds;
 
   db.prepare(
     `UPDATE races
@@ -188,10 +194,32 @@ export function updateRace(raceId: number, input: UpdateRaceInput): Race {
     raceId
   );
 
-  if (distanceChanged || input.leaderTimeSeconds !== undefined) {
+  if (distanceChanged || leaderChanged) {
     recalculateRacePoints(raceId);
   }
 
+  return db.prepare("SELECT * FROM races WHERE id = ?").get(raceId) as Race;
+}
+
+/** Update only the protocol winner time and recalculate points. */
+export function setRaceLeaderTime(
+  raceId: number,
+  leaderTimeSeconds: number
+): Race {
+  const db = getDb();
+  const existing = db.prepare("SELECT * FROM races WHERE id = ?").get(raceId) as
+    | Race
+    | undefined;
+  if (!existing) throw new Error("Varžybos nerastos");
+  if (!(leaderTimeSeconds > 0)) {
+    throw new Error("Nugalėtojo laikas turi būti teigiamas");
+  }
+
+  db.prepare("UPDATE races SET leader_time_seconds = ? WHERE id = ?").run(
+    leaderTimeSeconds,
+    raceId
+  );
+  recalculateRacePoints(raceId);
   return db.prepare("SELECT * FROM races WHERE id = ?").get(raceId) as Race;
 }
 
@@ -246,7 +274,10 @@ export function updateRaceResult(
   if (input.name !== undefined) {
     const trimmed = input.name.trim();
     if (!trimmed) throw new Error("Vardas negali būti tuščias");
-    const member = ensureMember(trimmed, row.sex);
+    const member = findActiveRosterMember(trimmed);
+    if (!member) {
+      throw new Error(`„${trimmed}“ ne oficialiame narių sąraše`);
+    }
     rawName = member.display_name;
     memberId = member.id;
   }
@@ -354,12 +385,15 @@ export function addManualResult(
 
   let member: Member | undefined;
   if (input.memberId != null) {
-    member = db
-      .prepare("SELECT * FROM members WHERE id = ?")
-      .get(input.memberId) as Member | undefined;
-    if (!member) throw new Error("Narys nerastas");
+    member = getMember(input.memberId);
+    if (!member || !member.active) {
+      throw new Error("Narys ne oficialiame sąraše");
+    }
   } else if (input.name?.trim()) {
-    member = ensureMember(input.name.trim(), input.sex ?? null);
+    member = findActiveRosterMember(input.name.trim());
+    if (!member) {
+      throw new Error(`„${input.name.trim()}“ ne oficialiame narių sąraše`);
+    }
   } else {
     throw new Error("Pasirinkite narį arba įveskite vardą");
   }

@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { formatDateLt } from "@/lib/dates";
 import { listMembers } from "@/lib/members";
 import { getRace, getRaceResults } from "@/lib/ranking";
+import { formatSeconds } from "@/lib/time-format";
 import { DeleteRaceButton } from "./DeleteRaceButton";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,9 @@ export default async function RaceDetailPage({
           <p>
             {formatDateLt(race.race_date)} · bazė {race.base_points} ·{" "}
             {race.distance_type}
+            {race.leader_time_seconds != null
+              ? ` · nugalėtojas ${formatSeconds(race.leader_time_seconds)}`
+              : " · nugalėtojo laikas —"}
             {race.source_filename ? ` · ${race.source_filename}` : ""}
             {" · "}
             reitinge {included}/{results.length}

@@ -241,6 +241,7 @@ function loadResults(year?: number): ResultRow[] {
   // Include DNF (0 points). DNS is stored with included_in_rating = 0.
   const where = `rr.included_in_rating = 1
            AND rr.member_id IS NOT NULL
+           AND m.active = 1
            AND rr.points IS NOT NULL
            AND rr.points >= 0
            AND COALESCE(rr.finish_status, 'ok') != 'dns'`;
@@ -251,7 +252,7 @@ function loadResults(year?: number): ResultRow[] {
                 rr.finish_status
          FROM race_results rr
          JOIN races r ON r.id = rr.race_id
-         LEFT JOIN members m ON m.id = rr.member_id
+         JOIN members m ON m.id = rr.member_id
          WHERE ${where}`;
   if (year != null) {
     return db
