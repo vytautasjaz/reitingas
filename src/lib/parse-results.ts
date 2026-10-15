@@ -1,3 +1,4 @@
+import * as XLSX from "xlsx";
 import {
   classifyFinishStatus,
   parseTimeToSeconds,
@@ -30,6 +31,138 @@ export type ParsedRaceFile = {
   rows: ParsedResultRow[];
   leaderTimeSeconds: number | null;
 };
+
+function emptyRowExtras() {
+  return {
+    bib: null as string | null,
+    country: null as string | null,
+    sex: null as string | null,
+    category: null as string | null,
+    swim: null as string | null,
+    t1: null as string | null,
+    bike: null as string | null,
+    t2: null as string | null,
+    run: null as string | null,
+    gap: null as string | null,
+    gunTime: null as string | null,
+    gunTimeSeconds: null as number | null,
+  };
+}
+
+function formatHms(totalSeconds: number): string {
+  const total = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function cellText(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    // Excel time serial (fraction of a day)
+    if (value > 0 && value < 1.5) {
+      return formatHms(value * 24 * 3600);
+    }
+    return String(value);
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    // Prefer local components — Excel time-only cells are wall-clock times.
+    return formatHms(
+      value.getHours() * 3600 + value.getMinutes() * 60 + value.getSeconds()
+    );
+  }
+  const text = String(value).replace(/\u00a0/g, " ").trim();
+  return text || null;
+}
+
+function isLeaderLabel(text: string | null): boolean {
+  if (!text) return false;
+  return /nugal[eė]?toj|leader\s*time|winner\s*time|lyderio\s*laik/i.test(
+    text.replace(/\s+/g, " ").trim()
+  );
+}
+
+/**
+ * Compact Tritonas roster spreadsheet:
+ *   row 0: ["Nugaletojas laikas", "3:57:55"]
+ *   row 1+: ["Vardas Pavardė", "4:21:57"]
+ */
+export function parseCompactTritonasSheet(
+  matrix: unknown[][]
+): ParsedRaceFile | null {
+  if (matrix.length < 2) return null;
+
+  const first = matrix[0] ?? [];
+  const label = cellText(first[0]);
+  const leaderFromCol2 = cellText(first[1]);
+  const leaderTimeSeconds = isLeaderLabel(label)
+    ? parseTimeToSeconds(leaderFromCol2)
+    : null;
+
+  if (leaderTimeSeconds == null || !isLeaderLabel(label)) {
+    return null;
+  }
+
+  const rows: ParsedResultRow[] = [];
+  let place = 0;
+  for (const raw of matrix.slice(1)) {
+    const name = cellText(raw?.[0]);
+    const time = cellText(raw?.[1]);
+    if (!name || isLeaderLabel(name)) continue;
+
+    const timeSeconds = parseTimeToSeconds(time);
+    const status = classifyFinishStatus(time);
+    let finishStatus: FinishStatus = "ok";
+    if (timeSeconds != null) finishStatus = "ok";
+    else if (status === "dns") finishStatus = "dns";
+    else if (status === "dnf" || time != null) finishStatus = "dnf";
+    else finishStatus = "dns";
+
+    if (finishStatus === "ok") place += 1;
+
+    rows.push({
+      place: finishStatus === "ok" ? place : null,
+      name,
+      club: "TRItonas",
+      time,
+      timeSeconds,
+      finishStatus,
+      ...emptyRowExtras(),
+    });
+  }
+
+  if (rows.length === 0) return null;
+  return { rows, leaderTimeSeconds };
+}
+
+export function parseResultsSpreadsheet(buffer: Buffer): ParsedRaceFile {
+  // Keep raw serials (not Date) so time-of-day is not shifted by timezone.
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) return { rows: [], leaderTimeSeconds: null };
+  const sheet = workbook.Sheets[sheetName];
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: null,
+    raw: true,
+  });
+
+  const compact = parseCompactTritonasSheet(matrix);
+  if (compact) return compact;
+
+  // Fallback: treat first row as headers if it looks like a protocol table
+  const asStrings = matrix.map((row) =>
+    (row ?? []).map((c) => cellText(c) ?? "")
+  );
+  const htmlish = asStrings
+    .map(
+      (row) =>
+        `<tr>${row.map((c) => `<td>${c}</td>`).join("")}</tr>`
+    )
+    .join("");
+  return parseResultsHtml(`<table>${htmlish}</table>`);
+}
 
 function decodeEntities(s: string): string {
   return s
@@ -166,6 +299,26 @@ export function parseResultsHtml(content: string): ParsedRaceFile {
   return { rows, leaderTimeSeconds };
 }
 
+function looksLikeHtmlResults(buffer: Buffer): boolean {
+  const head = buffer.subarray(0, Math.min(buffer.length, 8192)).toString("utf8");
+  return /<tr[\s>]|<table[\s>]|<html[\s>]/i.test(head);
+}
+
 export function parseResultsFileBuffer(buffer: Buffer): ParsedRaceFile {
-  return parseResultsHtml(buffer.toString("utf8"));
+  // LTT exports are often HTML saved as .xls; Gdansk-style rosters are real xlsx.
+  if (looksLikeHtmlResults(buffer)) {
+    return parseResultsHtml(buffer.toString("utf8"));
+  }
+  // ZIP/xlsx signature "PK"
+  if (buffer.length >= 2 && buffer[0] === 0x50 && buffer[1] === 0x4b) {
+    return parseResultsSpreadsheet(buffer);
+  }
+  // Last resort: try HTML, then spreadsheet
+  const asHtml = parseResultsHtml(buffer.toString("utf8"));
+  if (asHtml.rows.length > 0 && asHtml.leaderTimeSeconds != null) return asHtml;
+  try {
+    return parseResultsSpreadsheet(buffer);
+  } catch {
+    return asHtml;
+  }
 }
